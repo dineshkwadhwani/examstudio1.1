@@ -242,7 +242,7 @@ export interface Task2Payload {
   count_scoped: number
   actor_id: string
   run_id: string
-  actor_url: string
+  actor_url?: string
 }
 
 export interface Task3Payload {
@@ -250,7 +250,7 @@ export interface Task3Payload {
   temperature_c: number
   actor_id: string
   run_id: string
-  actor_url: string
+  actor_url?: string
 }
 
 // ─── SA dashboard ─────────────────────────────────────────────

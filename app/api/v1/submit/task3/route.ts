@@ -9,8 +9,6 @@ import { getRun } from '@/lib/apify'
 import { gradeTask3 } from '@/lib/grading'
 import type { Task3Payload } from '@/lib/types'
 
-const MAX_ATTEMPTS = 10
-
 export async function POST(req: NextRequest) {
   // ─── Auth ────────────────────────────────────────────────
   const resolved = await resolveApiKey(req)
@@ -42,7 +40,6 @@ export async function POST(req: NextRequest) {
                                  return err('bad_request', 'temperature_c is required.', 400)
   if (!actor_id?.trim())         return err('bad_request', 'actor_id is required.', 400)
   if (!run_id?.trim())           return err('bad_request', 'run_id is required.', 400)
-  if (!actor_url?.trim())        return err('bad_request', 'actor_url is required.', 400)
 
   if (typeof temperature_c !== 'number' || !isFinite(temperature_c)) {
     return err('bad_request', 'temperature_c must be a finite number.', 400)
@@ -57,21 +54,18 @@ export async function POST(req: NextRequest) {
     .eq('task_no', 3)
     .maybeSingle()
 
-  if (existing && existing.attempt_count >= MAX_ATTEMPTS) {
-    return err('max_attempts_reached', `Maximum of ${MAX_ATTEMPTS} submissions allowed for Task 3.`, 429)
-  }
-
-  // ─── Check run not submitted by another student ──────────
-  const { data: runConflict } = await db
-    .from('ca1_submissions')
+  // An actor may belong to only one student for this task in this session.
+  // Claims are retained even when the owner later replaces their answer.
+  const { data: actorClaim } = await db
+    .from('ca1_actor_claims')
     .select('student_id')
-    .eq('submitted_run_id', run_id.trim())
+    .eq('session_id', session.id)
+    .eq('actor_id', actor_id.trim())
     .eq('task_no', 3)
-    .neq('student_id', studentId)
-    .single()
+    .maybeSingle()
 
-  if (runConflict) {
-    return err('run_already_submitted', 'This run ID has already been submitted by another student.', 409)
+  if (actorClaim && actorClaim.student_id !== studentId) {
+    return err('actor_already_submitted', 'This Apify Actor has already been submitted by another student for Task 3.', 409)
   }
 
   // ─── Synchronously get Apify user ID ─────────────────────
@@ -83,38 +77,28 @@ export async function POST(req: NextRequest) {
   if (!session.relax_apify_verification) {
     const { run, error } = await getRun(run_id.trim())
     if (run) {
+      if (run.actId !== actor_id.trim()) {
+        return err('actor_id_mismatch', 'The submitted actor_id does not match the Apify run.', 409)
+      }
       apifyUserId = run.userId
       apifyRunStatus = run.status
       rawApifyResponse = run
 
-      if (apifyUserId) {
-        const { data: accountConflict } = await db
-          .from('ca1_submissions')
-          .select('student_id')
-          .eq('apify_user_id', apifyUserId)
-          .eq('task_no', 3)
-          .neq('student_id', studentId)
-          .not('verification_status', 'eq', 'failed')
-          .single()
-
-        if (accountConflict) {
-          await db.from('ca1_flags').insert({
-            session_id: session.id,
-            reason: 'apify_account_shared',
-            severity: 'review',
-            student_ids: [studentId, accountConflict.student_id],
-            detail: { apify_user_id: apifyUserId, task_no: 3, second_student_prn: prn },
-          })
-          return err(
-            'apify_account_already_used',
-            'This Apify account has already been used to submit Task 3 by another student.',
-            409
-          )
-        }
-      }
     } else {
       verificationStatus = 'deferred'
       console.warn(`Task 3: Apify unreachable for run ${run_id}: ${error}`)
+    }
+  }
+
+  if (!actorClaim) {
+    const { error: claimError } = await db.from('ca1_actor_claims').insert({
+      session_id: session.id,
+      task_no: 3,
+      actor_id: actor_id.trim(),
+      student_id: studentId,
+    })
+    if (claimError) {
+      return err('actor_already_submitted', 'This Apify Actor has already been submitted by another student for Task 3.', 409)
     }
   }
 
@@ -148,7 +132,7 @@ export async function POST(req: NextRequest) {
     user_agent: req.headers.get('user-agent'),
     submitted_run_id: run_id.trim(),
     submitted_actor_id: actor_id.trim(),
-    submitted_actor_url: actor_url.trim(),
+    submitted_actor_url: actor_url?.trim() || null,
     apify_user_id: apifyUserId,
     apify_run_status: apifyRunStatus,
     raw_apify_response: rawApifyResponse,

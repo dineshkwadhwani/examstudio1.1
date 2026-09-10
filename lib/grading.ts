@@ -39,13 +39,12 @@ export async function gradeTask2(
       apify_user_id: verification.userId,
       apify_run_status: 'unknown',
       raw_apify_response: { error: verification.error },
-    }).eq('id', submissionId)
+    }).eq('id', submissionId).eq('submitted_run_id', payload.run_id)
     return
   }
 
   let apifyRunOk = verification.ok
   let datasetItems: Record<string, unknown>[] = []
-  let datasetMatchOk = false
 
   if (apifyRunOk && verification.datasetId) {
     const ds = await getDatasetItems(verification.datasetId)
@@ -56,9 +55,14 @@ export async function gradeTask2(
         item.count_total === payload.count_total &&
         item.count_scoped === payload.count_scoped
     )
-    datasetMatchOk = hasMatch
-    if (!hasMatch && datasetItems.length > 0) {
+    if (ds.error) {
       apifyRunOk = false
+      verification.error = 'dataset_unavailable'
+    } else if (!hasMatch) {
+      apifyRunOk = false
+      verification.error = datasetItems.length === 0
+        ? 'dataset_result_not_found'
+        : 'dataset_counts_mismatch'
     }
   }
 
@@ -87,11 +91,15 @@ export async function gradeTask2(
     marks += 1.0
     detail.apify_run = { marks: 1.0, verified: true }
   } else {
-    detail.apify_run = { marks: 0, verified: false, error: verification.error }
+    detail.apify_run = {
+      marks: 0,
+      verified: false,
+      error: verification.error ?? 'run_evidence_not_verified',
+    }
   }
 
   // Fetch source for key-hardcoded check
-  const sourceSnapshot = await getActorSource(payload.actor_url)
+  const sourceSnapshot = payload.actor_url ? await getActorSource(payload.actor_url) : null
   const keyPrefix = 'exk_live'
   const keyHardcoded = sourceSnapshot ? sourceSnapshot.includes(keyPrefix) : null
 
@@ -107,7 +115,7 @@ export async function gradeTask2(
     source_snapshot: sourceSnapshot,
     source_fetched_at: new Date().toISOString(),
     key_hardcoded: keyHardcoded,
-  }).eq('id', submissionId)
+  }).eq('id', submissionId).eq('submitted_run_id', payload.run_id)
 }
 
 // ─── Grade Task 3 ────────────────────────────────────────────
@@ -133,7 +141,7 @@ export async function gradeTask3(
       verification_status: 'deferred',
       apify_user_id: verification.userId,
       raw_apify_response: { error: verification.error },
-    }).eq('id', submissionId)
+    }).eq('id', submissionId).eq('submitted_run_id', payload.run_id)
     return
   }
 
@@ -198,11 +206,11 @@ export async function gradeTask3(
       apify_finished_at: verification.finishedAt,
       raw_apify_response: verification.rawRun,
       grading_detail: detail,
-    }).eq('id', submissionId)
+    }).eq('id', submissionId).eq('submitted_run_id', payload.run_id)
     return
   }
 
-  const sourceSnapshot = await getActorSource(payload.actor_url)
+  const sourceSnapshot = payload.actor_url ? await getActorSource(payload.actor_url) : null
   const keyHardcoded = sourceSnapshot ? sourceSnapshot.includes('exk_live') : null
 
   await db.from('ca1_submissions').update({
@@ -221,7 +229,7 @@ export async function gradeTask3(
       read_at: weather.read_at,
       raw: weather.raw,
     },
-  }).eq('id', submissionId)
+  }).eq('id', submissionId).eq('submitted_run_id', payload.run_id)
 }
 
 // ─── Run pending verifications ────────────────────────────────

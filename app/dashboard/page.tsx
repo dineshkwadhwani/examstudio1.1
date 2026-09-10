@@ -548,8 +548,10 @@ export default function DashboardPage() {
                   <ul className="mt-1 space-y-0.5">
                     <li><code className="font-mono">count_total</code> — total occurrences across the corpus</li>
                     <li><code className="font-mono">count_scoped</code> — occurrences on your scoped page</li>
-                    <li><code className="font-mono">actor_id</code>, <code className="font-mono">run_id</code>, and <code className="font-mono">actor_url</code> — your deployed Actor and successful run</li>
+                    <li><code className="font-mono">actor_id</code> and <code className="font-mono">run_id</code> — your deployed Actor and successful run</li>
                   </ul>
+                  <p className="font-semibold text-gray-900 mt-3">Marks</p>
+                  <ul className="mt-1 space-y-0.5"><li>1.5 marks — correct whole-corpus count</li><li>1.5 marks — correct scoped-page count</li><li>1 mark — successful Apify run verified in the exam window</li></ul>
                 </div>
 
                 <div className="mt-3 bg-gray-50 rounded-lg p-3 text-xs text-gray-600">
@@ -558,8 +560,7 @@ export default function DashboardPage() {
   "count_total": <whole corpus count>,
   "count_scoped": <page ${paper?.task2.scoped_page ?? '?'} count>,
   "actor_id": "<APIFY_ACTOR_ID env var>",
-  "run_id": "<APIFY_ACTOR_RUN_ID env var>",
-  "actor_url": "https://apify.com/username/actor"
+  "run_id": "<APIFY_ACTOR_RUN_ID env var>"
 }`}</code>
                 </div>
               </div>
@@ -599,8 +600,10 @@ export default function DashboardPage() {
                   <ul className="mt-1 space-y-0.5">
                     <li><code className="font-mono">city</code> — city from the spreadsheet row matching your PRN</li>
                     <li><code className="font-mono">temperature_c</code> — temperature obtained from Open-Meteo</li>
-                    <li><code className="font-mono">actor_id</code>, <code className="font-mono">run_id</code>, and <code className="font-mono">actor_url</code> — your deployed Actor and successful run</li>
+                    <li><code className="font-mono">actor_id</code> and <code className="font-mono">run_id</code> — your deployed Actor and successful run</li>
                   </ul>
+                  <p className="font-semibold text-gray-900 mt-3">Marks</p>
+                  <ul className="mt-1 space-y-0.5"><li>2 marks — correct city from the PRN row</li><li>3 marks — temperature within ±2°C of the server reading</li></ul>
                 </div>
 
                 <div className="mt-3 bg-gray-50 rounded-lg p-3 text-xs text-gray-600">
@@ -609,8 +612,7 @@ export default function DashboardPage() {
   "city": "<city name from spreadsheet>",
   "temperature_c": <number from Open-Meteo>,
   "actor_id": "<APIFY_ACTOR_ID env var>",
-  "run_id": "<APIFY_ACTOR_RUN_ID env var>",
-  "actor_url": "https://apify.com/username/actor"
+  "run_id": "<APIFY_ACTOR_RUN_ID env var>"
 }`}</code>
                 </div>
               </div>

@@ -4,6 +4,7 @@ import { db, audit } from '@/lib/db'
 import { ok, badRequest, forbidden, err, serverError } from '@/lib/api'
 import { requireStaff } from '@/lib/session'
 import { runPendingVerifications } from '@/lib/grading'
+import { POST_EXAM_VERIFICATION_DELAY_MS, runDueVerifications } from '@/lib/session-lifecycle'
 
 export async function POST(req: NextRequest) {
   let staff
@@ -27,6 +28,20 @@ export async function POST(req: NextRequest) {
     if (submission_id === undefined) return badRequest('submission_id is required.')
     if (override_marks === undefined) return badRequest('override_marks is required.')
     if (!reason?.trim()) return badRequest('reason is required for an override.')
+
+    const { data: submission } = await db
+      .from('ca1_submissions')
+      .select('task_no')
+      .eq('id', submission_id)
+      .maybeSingle()
+
+    if (!submission) return err('not_found', 'Submission not found.', 404)
+
+    const maxMarks: Record<number, number> = { 1: 1, 2: 4, 3: 5 }
+    const maximum = maxMarks[submission.task_no]
+    if (!Number.isFinite(override_marks) || maximum === undefined || override_marks < 0 || override_marks > maximum) {
+      return badRequest(`Override marks for Task ${submission.task_no} must be between 0 and ${maximum}.`)
+    }
 
     const { error } = await db.from('ca1_submissions').update({
       override_marks,
@@ -85,12 +100,36 @@ export async function POST(req: NextRequest) {
 
     const { session_id } = body
 
+    if (!session_id) {
+      const sessionIds = await runDueVerifications()
+      return ok({
+        message: `Verification ran for ${sessionIds.length} session(s) that completed their five-minute settlement period.`,
+        session_ids: sessionIds,
+      })
+    }
+
+    const { data: examSession } = await db
+      .from('ca1_exam_sessions')
+      .select('status, closed_at')
+      .eq('id', session_id)
+      .maybeSingle()
+
+    if (!examSession) return err('not_found', 'Exam session not found.', 404)
+    if (examSession.status !== 'closed' || !examSession.closed_at) {
+      return badRequest('Verification starts after the exam session is closed.')
+    }
+
+    const eligibleAt = new Date(new Date(examSession.closed_at).getTime() + POST_EXAM_VERIFICATION_DELAY_MS)
+    if (new Date() < eligibleAt) {
+      return err('verification_waiting', `Verification will start at ${eligibleAt.toISOString()}.`, 409)
+    }
+
     // Count pending before
     let beforeQuery = db
       .from('ca1_submissions')
       .select('*', { count: 'exact', head: true })
       .in('verification_status', ['pending', 'deferred'])
-    if (session_id) beforeQuery = beforeQuery.eq('session_id', session_id)
+    beforeQuery = beforeQuery.eq('session_id', session_id)
     const { count: before } = await beforeQuery
 
     await runPendingVerifications(session_id)
@@ -100,7 +139,7 @@ export async function POST(req: NextRequest) {
       .from('ca1_submissions')
       .select('*', { count: 'exact', head: true })
       .in('verification_status', ['pending', 'deferred'])
-    if (session_id) afterQuery = afterQuery.eq('session_id', session_id)
+    afterQuery = afterQuery.eq('session_id', session_id)
     const { count: after } = await afterQuery
 
     await audit(`staff:${staff.email}`, 'manual_verification_run', session_id ? `session:${session_id}` : undefined, {

@@ -2,7 +2,7 @@ import { NextRequest } from 'next/server'
 import { db, audit } from '@/lib/db'
 import { ok, err, badRequest, serverError, forbidden } from '@/lib/api'
 import { requireStaff } from '@/lib/session'
-import { verifyAfterManualClose } from '@/lib/session-lifecycle'
+import { POST_EXAM_VERIFICATION_DELAY_MS, runDueVerifications, verifyAfterManualClose } from '@/lib/session-lifecycle'
 
 // GET — list all sessions
 export async function GET() {
@@ -121,6 +121,52 @@ export async function POST(req: NextRequest) {
       })
 
       return ok({ ...data, _sheet_rows_loaded: rowCount, _corpus_words: wordCount }, 201)
+    }
+
+    // ─── Release results ──────────────────────────────────
+    if (action === 'toggle_results') {
+      if (!session_id) return badRequest('session_id is required.')
+
+      const { data: session } = await db
+        .from('ca1_exam_sessions')
+        .select('id, status, closed_at, results_released_at')
+        .eq('id', session_id)
+        .maybeSingle()
+
+      if (!session) return err('not_found', 'Session not found.', 404)
+      if (!['closed', 'archived'].includes(session.status)) {
+        return badRequest('Results can be released only after the exam is closed.')
+      }
+
+      if (!session.results_released_at) {
+        if (!session.closed_at) return badRequest('The exam must be closed before results can be released.')
+        const eligibleAt = new Date(new Date(session.closed_at).getTime() + POST_EXAM_VERIFICATION_DELAY_MS)
+        if (new Date() < eligibleAt) {
+          return err('verification_waiting', `Results can be released after verification starts at ${eligibleAt.toISOString()}.`, 409)
+        }
+
+        await runDueVerifications()
+        const { count, error: pendingError } = await db
+          .from('ca1_submissions')
+          .select('*', { count: 'exact', head: true })
+          .eq('session_id', session_id)
+          .in('task_no', [2, 3])
+          .in('verification_status', ['pending', 'deferred'])
+        if (pendingError) return serverError('Could not check verification status.')
+        if ((count ?? 0) > 0) {
+          return err('verification_pending', `${count} practical submission(s) still need verification before results can be released.`, 409)
+        }
+      }
+
+      const resultsReleasedAt = session.results_released_at ? null : new Date().toISOString()
+      const { error } = await db
+        .from('ca1_exam_sessions')
+        .update({ results_released_at: resultsReleasedAt })
+        .eq('id', session_id)
+      if (error) return serverError('Could not update result visibility.')
+
+      await audit(`staff:${staff.email}`, resultsReleasedAt ? 'results_released' : 'results_hidden', `session:${session_id}`)
+      return ok({ results_released_at: resultsReleasedAt })
     }
 
     // ─── Transition status ────────────────────────────────

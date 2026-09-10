@@ -7,6 +7,7 @@ export interface StudentExam {
   started_at: string | null
   ends_at: string | null
   created_at: string
+  results_released_at: string | null
   ca1_exam_definitions: { code: string; title: string } | null
 }
 
@@ -28,7 +29,7 @@ export async function getStudentExams(studentId: number): Promise<StudentExam[]>
   const exams: StudentExam[] = []
   for (let offset = 0; offset < ids.length; offset += 100) {
     const { data, error } = await db.from('ca1_exam_sessions')
-      .select('id, label, status, started_at, ends_at, created_at, ca1_exam_definitions(code, title)')
+      .select('id, label, status, started_at, ends_at, created_at, results_released_at, ca1_exam_definitions(code, title)')
       .in('id', ids.slice(offset, offset + 100))
     if (error) throw new Error('Could not load your exam history.')
     exams.push(...(data as unknown as StudentExam[] ?? []))

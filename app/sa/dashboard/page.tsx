@@ -26,6 +26,7 @@ interface Session {
   started_at: string | null
   ends_at: string | null
   closed_at: string | null
+  results_released_at: string | null
   relax_apify_verification: boolean
   sheet_csv_url: string
   verification: { total: number; pending: number; complete: boolean }
@@ -94,6 +95,29 @@ export default function SADashboard() {
       body: JSON.stringify({ action: 'toggle_apify_relax', session_id: sessionId, reason: 'Manual toggle from dashboard' }),
     })
     if (res.ok) fetchAll()
+  }
+
+  async function toggleResults(session: Session) {
+    const action = session.results_released_at ? 'hide' : 'release'
+    if (!window.confirm(`${action === 'release' ? 'Release' : 'Hide'} results for “${session.label}”?`)) return
+    setTransitioning(true)
+    setMsg('')
+    setError('')
+    try {
+      const res = await fetch('/api/sa/session', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'toggle_results', session_id: session.id }),
+      })
+      const data = await res.json()
+      if (!res.ok) throw new Error(data.message ?? 'Could not update result visibility.')
+      setMsg(data.results_released_at ? 'Results released to students.' : 'Results hidden from students.')
+      await fetchAll()
+    } catch (error) {
+      setError(error instanceof Error ? error.message : 'Could not update result visibility.')
+    } finally {
+      setTransitioning(false)
+    }
   }
 
   async function runVerifications() {
@@ -423,9 +447,21 @@ export default function SADashboard() {
                     </>
                   )}
                   {s.status === 'closed' && (
-                    <button onClick={() => transition(s.id, 'archived')} disabled={transitioning}
-                      className="btn-secondary text-xs">
-                      Archive
+                    <>
+                      <button onClick={() => transition(s.id, 'archived')} disabled={transitioning}
+                        className="btn-secondary text-xs">
+                        Archive
+                      </button>
+                      <button onClick={() => toggleResults(s)} disabled={transitioning}
+                        className={s.results_released_at ? 'btn-secondary text-xs' : 'btn-primary text-xs'}>
+                        {s.results_released_at ? 'Hide results' : 'Show results'}
+                      </button>
+                    </>
+                  )}
+                  {s.status === 'archived' && (
+                    <button onClick={() => toggleResults(s)} disabled={transitioning}
+                      className={s.results_released_at ? 'btn-secondary text-xs' : 'btn-primary text-xs'}>
+                      {s.results_released_at ? 'Hide results' : 'Show results'}
                     </button>
                   )}
                   {(s.status === 'setup' || s.status === 'closed' || s.status === 'archived') && (
@@ -444,13 +480,13 @@ export default function SADashboard() {
                     </button>
                   )}
 
-                  {s.verification.pending > 0 && (
+                  {s.status === 'closed' && s.verification.pending > 0 && (
                     <button
                       onClick={() => runSessionVerifications(s.id)}
                       disabled={verifying}
                       className="btn-primary text-xs bg-yellow-600 hover:bg-yellow-700"
                     >
-                      {verifying ? 'Verifying…' : `Run Apify verification (${s.verification.pending})`}
+                      {verifying ? 'Verifying…' : `Verify after 5-minute settlement (${s.verification.pending})`}
                     </button>
                   )}
 

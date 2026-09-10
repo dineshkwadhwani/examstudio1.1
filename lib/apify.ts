@@ -126,7 +126,19 @@ export async function verifyRun(params: VerifyRunParams): Promise<VerifyRunResul
   }
 
   if (run.status !== 'SUCCEEDED') {
-    return { ok: false, userId: run.userId, finishedAt: run.finishedAt, datasetId: run.defaultDatasetId, rawRun: run, error: `run_status_${run.status}`, deferred: false }
+    // A student can submit just before Apify updates the run to its terminal
+    // state. Keep polling states pending instead of permanently taking the
+    // run-evidence mark away.
+    const stillProcessing = ['READY', 'RUNNING', 'ABORTING', 'TIMING-OUT'].includes(run.status)
+    return {
+      ok: false,
+      userId: run.userId,
+      finishedAt: run.finishedAt,
+      datasetId: run.defaultDatasetId,
+      rawRun: run,
+      error: `run_status_${run.status}`,
+      deferred: stillProcessing,
+    }
   }
 
   if (!run.finishedAt) {

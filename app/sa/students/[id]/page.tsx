@@ -218,7 +218,7 @@ export default function StudentDetailPage() {
   const { student, api_key, paper, mcq_assignments, submissions, attempts, flags, exceptions, audit_log } = data
 
   const taskMarks = (taskNo: number) => {
-    const maxMap: Record<number, number> = { 1: 2, 2: 3, 3: 5 }
+    const maxMap: Record<number, number> = { 1: 1, 2: 4, 3: 5 }
     const sub = submissions.find(s => s.task_no === taskNo)
     if (!sub) return { sub: null, effective: null, max: maxMap[taskNo] }
     const effective = sub.override_marks !== null ? sub.override_marks : sub.marks_awarded
@@ -343,6 +343,9 @@ export default function StudentDetailPage() {
         {[1, 2, 3].map(taskNo => {
           const { sub, effective, max } = taskMarks(taskNo)
           const taskAttempts = attempts.filter(a => a.task_no === taskNo)
+          const apifyRunDetail = taskNo === 2 && sub && sub.grading_detail?.apify_run && typeof sub.grading_detail.apify_run === 'object'
+            ? sub.grading_detail.apify_run as Record<string, unknown>
+            : null
           const taskTitles: Record<number, string> = {
             1: 'API Key + Paper Retrieval',
             2: 'Corpus Word Count (Apify)',
@@ -387,6 +390,14 @@ export default function StudentDetailPage() {
                     taskNo={taskNo}
                     onSaved={load}
                   />
+
+                  {apifyRunDetail && (
+                    <p className="text-xs text-gray-600">
+                      Apify run verification: {apifyRunDetail.verified === true
+                        ? 'Passed (1 / 1 mark).'
+                        : `Not awarded: ${String(apifyRunDetail.error ?? 'run evidence was not verified')}.`}
+                    </p>
+                  )}
 
                   {/* Task 2: expected vs submitted */}
                   {taskNo === 2 && paper && (
@@ -452,7 +463,7 @@ export default function StudentDetailPage() {
                       <Kv label="Key hardcoded" value={
                         sub.key_hardcoded === true ? <span className="text-orange-600 font-semibold">YES — feedback only, not graded</span>
                         : sub.key_hardcoded === false ? 'No'
-                        : 'Not checked'
+                        : 'Source unavailable — not assessed'
                       } />
                     </div>
                   )}

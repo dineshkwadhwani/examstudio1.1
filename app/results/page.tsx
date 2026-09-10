@@ -134,8 +134,8 @@ export default function ResultsPage() {
 
         {/* Tasks */}
         {[
-          { no: 1, label: 'Task 1 — Paper Retrieval', max: 2, t: t1 },
-          { no: 2, label: 'Task 2 — Corpus Word Count', max: 3, t: t2 },
+          { no: 1, label: 'Task 1 — Fetch My Magic Code', max: 1, t: t1 },
+          { no: 2, label: 'Task 2 — Corpus Word Count', max: 4, t: t2 },
           { no: 3, label: 'Task 3 — City Temperature', max: 5, t: t3 },
         ].map(({ no, label, max, t }) => {
           const sl = t?.submitted

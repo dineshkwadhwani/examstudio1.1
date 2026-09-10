@@ -1,5 +1,5 @@
 import { NextRequest } from 'next/server'
-import { runPendingVerifications } from '@/lib/grading'
+import { runDueVerifications } from '@/lib/session-lifecycle'
 import { db } from '@/lib/db'
 
 // This endpoint is called by Vercel Cron (configured in vercel.json)
@@ -34,10 +34,10 @@ export async function GET(req: NextRequest) {
     })
   }
 
-  // Run pending verifications
-  await runPendingVerifications()
+  // Runs only for sessions that have been closed for at least five minutes.
+  const verifiedSessionIds = await runDueVerifications()
 
-  return new Response(JSON.stringify({ ok: true, ran_at: now }), {
+  return new Response(JSON.stringify({ ok: true, ran_at: now, verified_session_ids: verifiedSessionIds }), {
     headers: { 'Content-Type': 'application/json' },
   })
 }
