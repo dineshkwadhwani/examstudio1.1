@@ -10,18 +10,20 @@ export function AccountMenu() {
   const menu = useRef<HTMLDetailsElement>(null)
 
   useEffect(() => {
-    const controller = new AbortController()
-    fetch('/api/me/profile', { signal: controller.signal, cache: 'no-store' })
+    let active = true
+    fetch('/api/me/profile', { cache: 'no-store' })
       .then(async response => {
+        if (!active) return
         if (response.status === 401 || response.status === 403) {
           window.location.replace('/login')
           return
         }
         if (!response.ok) throw new Error('Could not load account details.')
-        setStudent(await response.json())
+        const profile = await response.json()
+        if (active) setStudent(profile)
       })
       .catch(() => {
-        if (!controller.signal.aborted) setError('Could not load account details. Refresh to try again.')
+        if (active) setError('Could not load account details. Refresh to try again.')
       })
     function closeOutside(event: PointerEvent) {
       if (menu.current && !menu.current.contains(event.target as Node)) menu.current.open = false
@@ -35,7 +37,7 @@ export function AccountMenu() {
     document.addEventListener('pointerdown', closeOutside)
     document.addEventListener('keydown', closeOnEscape)
     return () => {
-      controller.abort()
+      active = false
       document.removeEventListener('pointerdown', closeOutside)
       document.removeEventListener('keydown', closeOnEscape)
     }
