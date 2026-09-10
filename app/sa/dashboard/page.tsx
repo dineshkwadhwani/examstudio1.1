@@ -42,6 +42,7 @@ export default function SADashboard() {
   const [transitioning, setTransitioning] = useState(false)
   const [newSessionForm, setNewSessionForm] = useState({ label: '', exam_id: '1', show: false })
   const [verifying, setVerifying] = useState(false)
+  const [refreshingSnapshot, setRefreshingSnapshot] = useState<number | null>(null)
   const [verifyResult, setVerifyResult] = useState<{ pending_before: number; pending_after: number; processed: number } | null>(null)
 
   const fetchAll = useCallback(async () => {
@@ -175,6 +176,27 @@ export default function SADashboard() {
     setVerifying(false)
     if (res.ok) { setMsg(data.message); fetchAll() }
     else { setError(data.message ?? 'Failed.') }
+  }
+
+  async function refreshSnapshot(sessionId: number) {
+    setRefreshingSnapshot(sessionId)
+    setMsg('')
+    setError('')
+    try {
+      const res = await fetch('/api/sa/session', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'refresh_snapshot', session_id: sessionId }),
+      })
+      const data = await res.json()
+      if (!res.ok) throw new Error(data.message ?? 'Could not refresh the session snapshot.')
+      setMsg(data.message)
+      await fetchAll()
+    } catch (error) {
+      setError(error instanceof Error ? error.message : 'Could not refresh the session snapshot.')
+    } finally {
+      setRefreshingSnapshot(null)
+    }
   }
 
   async function createSession() {
@@ -462,6 +484,15 @@ export default function SADashboard() {
                     <button onClick={() => toggleResults(s)} disabled={transitioning}
                       className={s.results_released_at ? 'btn-secondary text-xs' : 'btn-primary text-xs'}>
                       {s.results_released_at ? 'Hide results' : 'Show results'}
+                    </button>
+                  )}
+                  {['setup', 'registration_open', 'running'].includes(s.status) && (
+                    <button
+                      onClick={() => refreshSnapshot(s.id)}
+                      disabled={refreshingSnapshot !== null}
+                      className="btn-secondary text-xs"
+                    >
+                      {refreshingSnapshot === s.id ? 'Refreshing…' : 'Refresh late-student rows'}
                     </button>
                   )}
                   {(s.status === 'setup' || s.status === 'closed' || s.status === 'archived') && (

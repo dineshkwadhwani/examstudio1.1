@@ -115,7 +115,7 @@ export async function POST(req: NextRequest) {
       .maybeSingle()
 
     if (!examSession) return err('not_found', 'Exam session not found.', 404)
-    if (examSession.status !== 'closed' || !examSession.closed_at) {
+    if (!['closed', 'archived'].includes(examSession.status) || !examSession.closed_at) {
       return badRequest('Verification starts after the exam session is closed.')
     }
 

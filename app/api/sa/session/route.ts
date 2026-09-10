@@ -123,6 +123,66 @@ export async function POST(req: NextRequest) {
       return ok({ ...data, _sheet_rows_loaded: rowCount, _corpus_words: wordCount }, 201)
     }
 
+    // ─── Add late students to an existing session ─────────
+    if (action === 'refresh_snapshot') {
+      if (!session_id) return badRequest('session_id is required.')
+
+      const { data: session } = await db
+        .from('ca1_exam_sessions')
+        .select('id, label, status, sheet_snapshot')
+        .eq('id', session_id)
+        .single()
+
+      if (!session) return err('not_found', 'Session not found.', 404)
+      if (!['setup', 'registration_open', 'running'].includes(session.status)) {
+        return badRequest('Only setup, registration-open, or running sessions can receive late students.')
+      }
+
+      const sheetCsvUrl = process.env.TASK3_SHEET_CSV_URL
+      if (!sheetCsvUrl) {
+        return serverError('TASK3_SHEET_CSV_URL is not set. Add it to your environment variables.')
+      }
+
+      let csv: string
+      try {
+        const sheetRes = await fetch(sheetCsvUrl, { signal: AbortSignal.timeout(15_000) })
+        if (!sheetRes.ok) return serverError(`Could not fetch spreadsheet (HTTP ${sheetRes.status}).`)
+        csv = await sheetRes.text()
+      } catch (e) {
+        return serverError(`Could not fetch spreadsheet: ${e}`)
+      }
+
+      const latestSnapshot = parseCsvToSnapshot(csv)
+      const existingSnapshot = (session.sheet_snapshot ?? {}) as Record<string, unknown>
+      const newRows = Object.fromEntries(
+        Object.entries(latestSnapshot).filter(([prn]) => !(prn in existingSnapshot))
+      )
+      const mergedSnapshot = { ...existingSnapshot, ...newRows }
+
+      await db.from('ca1_exam_sessions')
+        .update({
+          sheet_snapshot: mergedSnapshot,
+          sheet_hash: await hashString(csv),
+          sheet_csv_url: sheetCsvUrl,
+        })
+        .eq('id', session_id)
+
+      const addedCount = Object.keys(newRows).length
+      await audit(`staff:${staff.email}`, 'session_snapshot_refreshed', `session:${session_id}`, {
+        added_rows: addedCount,
+        total_rows: Object.keys(mergedSnapshot).length,
+        session_status: session.status,
+      })
+
+      return ok({
+        message: addedCount > 0
+          ? `${addedCount} new student row${addedCount === 1 ? '' : 's'} added to ${session.label}.`
+          : 'No new student rows found in the CSV.',
+        added_rows: addedCount,
+        total_rows: Object.keys(mergedSnapshot).length,
+      })
+    }
+
     // ─── Release results ──────────────────────────────────
     if (action === 'toggle_results') {
       if (!session_id) return badRequest('session_id is required.')

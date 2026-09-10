@@ -13,7 +13,7 @@ export async function runDueVerifications(): Promise<number[]> {
   const { data: sessions, error } = await db
     .from('ca1_exam_sessions')
     .select('id')
-    .eq('status', 'closed')
+    .in('status', ['closed', 'archived'])
     .not('closed_at', 'is', null)
     .lte('closed_at', dueBefore)
 
