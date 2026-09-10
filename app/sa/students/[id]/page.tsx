@@ -280,7 +280,9 @@ export default function StudentDetailPage() {
     return { sub, effective, max: maxMap[taskNo] }
   }
 
-  const mcqScore = mcq_assignments.filter(a => a.ca1_mcq_questions?.correct_key && a.answered_key === a.ca1_mcq_questions?.correct_key).length * 0.5
+  // is_correct is recorded when the student answers. It is authoritative for
+  // historical attempts because question answer labels may be rebalanced later.
+  const mcqScore = mcq_assignments.filter(a => a.is_correct === true).length * 0.5
 
   const totalMarks =
     mcqScore +
@@ -350,7 +352,7 @@ export default function StudentDetailPage() {
             const slot = q?.ca1_mcq_slots
             const correct = q?.correct_key
             const studentAns = a.answered_key
-            const isCorrect = studentAns === correct
+            const isCorrect = a.is_correct === true
 
             return (
               <div key={a.slot_no} className={`border rounded-lg p-4 ${isCorrect ? 'border-green-200 bg-green-50' : studentAns ? 'border-red-200 bg-red-50' : 'border-gray-200'}`}>
@@ -371,7 +373,9 @@ export default function StudentDetailPage() {
                     const opt = q?.options?.find(o => o.key === key)
                     if (!opt) return null
                     const isStudentAns = key === studentAns
-                    const isCorrectOpt = key === correct
+                    // For a correct historical answer, the selected option is
+                    // the option that was graded as correct at answer time.
+                    const isCorrectOpt = isCorrect ? key === studentAns : key === correct
                     return (
                       <div key={key} className={`text-xs px-3 py-2 rounded flex items-start gap-2 ${
                         isCorrectOpt ? 'bg-green-100 text-green-800' :
