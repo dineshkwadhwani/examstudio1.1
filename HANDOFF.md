@@ -5,7 +5,7 @@
 **Institution:** Symbiosis Institute of Technology, Pune  
 **Domain:** examstudioca2.thecoachdinesh.com  
 **Owner:** Dinesh Wadhwani (dinesh.k.wadhwani@gmail.com)  
-**Document version:** September 2026 — v5, captures full state including all design changes
+**Document version:** September 2026 — v6, updated 10 September 2026
 
 ---
 
@@ -21,7 +21,7 @@ A reusable web-based platform for conducting API-integration practical examinati
 |---|---|---|
 | Framework | Next.js 16 (App Router, TypeScript) | `app/` directory, strict mode |
 | Database | Supabase Postgres | Pooled connection port 6543 (pgBouncer transaction mode) |
-| Hosting | Vercel | Cron job every 1 min for verification and auto-close |
+| Hosting | Vercel | Server-rendered Next.js application; no Vercel Cron dependency |
 | Auth | JWT cookie via `jose` | Cookie: `ca1_session`, 24h, httpOnly, sameSite=lax |
 | Passwords | bcryptjs cost 12 | Never stored in plaintext |
 | API keys | SHA-256 hash stored | Raw key shown once only at generation |
@@ -128,13 +128,14 @@ Must use lat/lon from spreadsheet — not geocode the city name.
 
 **Tasks 2 and 3:**
 - Student builds Apify actor, runs it, POSTs result to exam API with X-API-Key header
-- Returns 202 immediately — verification is async
-- Can resubmit up to 10 times while running — latest submission graded
+- Returns 202 immediately — practical verification happens after the exam closes
+- Can replace a broken actor or run while the exam is running; the latest submission is the only one graded
 - Marks hidden until exam closes
 
 **After exam closes:**
-- Results page shows full breakdown
-- MCQ marks immediate, task marks after verification completes
+- Wait five minutes for Apify to settle, then SA clicks **Show results** for that session
+- The action verifies pending practical submissions and releases results only when none remain pending
+- Students see marks and their answer sheet in **My Exams** only after release
 
 ---
 
@@ -183,6 +184,7 @@ corpus_reference_table  JSONB   ← the word count lookup table
 sheet_csv_url     TEXT    ← the Google Sheets export URL
 sheet_snapshot    JSONB   ← frozen PRN→city/lat/lon map
 sheet_hash        TEXT
+results_released_at TIMESTAMPTZ  ← NULL until SA chooses Show results
 ```
 
 **`ca1_question_papers`** — has magic_code column added by migration 004:
@@ -195,6 +197,11 @@ magic_code  TEXT  ← one of: Red, Blue, Green, Orange
 Effective marks = COALESCE(override_marks, marks_awarded)
 Never use marks_awarded directly in any report or display.
 ```
+
+**`ca1_actor_claims`** — added by migration 009. It permanently records the
+first API-key owner of an actor for one Task 2/3 session. A student can replace
+their answer with a new actor, but another student cannot submit any actor that
+has already been claimed in that task/session.
 
 ### All 17 tables
 
@@ -213,13 +220,8 @@ ca1_staff                 ca1_audit_log
 -- One running session at a time
 CREATE UNIQUE INDEX ca1_one_active_session ON ca1_exam_sessions (status) WHERE status = 'running';
 
--- Apify account per task (across students)
-CREATE UNIQUE INDEX ca1_uniq_apify_user_task ON ca1_submissions (apify_user_id, task_no)
-  WHERE apify_user_id IS NOT NULL AND verification_status <> 'failed';
-
--- Run ID per task
-CREATE UNIQUE INDEX ca1_uniq_run_task ON ca1_submissions (submitted_run_id, task_no)
-  WHERE submitted_run_id IS NOT NULL;
+-- Actor ownership is per session and task; claims survive answer replacement
+CREATE UNIQUE INDEX ON ca1_actor_claims (session_id, task_no, actor_id);
 ```
 
 ### RPC functions (must be added manually in Supabase SQL editor)
@@ -246,6 +248,12 @@ Run in order. All are in `supabase/migrations/`.
 | `002_ca1_seed.sql` | SA account (placeholder hash), exam def, MCQ bank (40 questions), roster (231 students) | Fresh setup only |
 | `003_ca1_corpus.sql` | Adds corpus columns to exam_definitions, populates reference table from generated corpus, creates Batch 1 and Batch 2 sessions | Run once after corpus generated |
 | `004_ca1_task1_magic_code.sql` | Updates mark structure (T1→1, T2→4 with 1.5/1.5/1.0), adds magic_code to question_papers, updates task components | Run once |
+| `005_ca1_student_session_and_key_reveal.sql` | Makes work session-scoped and enables authenticated API-key reveal | Run once |
+| `006_ca1_test_submission.sql` | Adds Submit Test and locks answers after final submission | Run once |
+| `007_ca1_delete_student_data.sql` | Deletes a student’s account and exam work while preserving roster entries | Run once |
+| `008_ca1_delete_exam_session.sql` | Deletes one exam session and its work while preserving students and roster | Run once |
+| `009_ca1_actor_claims.sql` | Adds actor ownership per session/task and removes Apify-account exclusivity | Applied to production 10 Sep 2026 |
+| `010_ca1_results_release.sql` | Adds SA-controlled result visibility | Applied to production 10 Sep 2026 |
 
 ### If migrations 001 and 002 already ran — apply this patch first
 
@@ -336,8 +344,8 @@ POST /api/me/task1             { colour: 'Red'|'Blue'|'Green'|'Orange' } → { r
 ```
 GET  /api/v1/paper             → rendered paper JSON (idempotent, rate-limited 30/min)
 POST /api/v1/submit/task1      { colour } → 202
-POST /api/v1/submit/task2      { count_total, count_scoped, actor_id, run_id, actor_url } → 202
-POST /api/v1/submit/task3      { city, temperature_c, actor_id, run_id, actor_url } → 202
+POST /api/v1/submit/task2      { count_total, count_scoped, actor_id, run_id, actor_url? } → 202
+POST /api/v1/submit/task3      { city, temperature_c, actor_id, run_id, actor_url? } → 202
 GET  /api/v1/status            → task status
 ```
 
@@ -348,6 +356,7 @@ GET  /api/sa/session                            → list all sessions
 POST /api/sa/session  { action: 'create', label, exam_id }
 POST /api/sa/session  { action: 'transition', session_id, new_status }
 POST /api/sa/session  { action: 'toggle_apify_relax', session_id }
+POST /api/sa/session  { action: 'toggle_results', session_id }
 GET  /api/sa/session/stats                      → live board numbers
 GET  /api/sa/students                           → list
 GET  /api/sa/students?id=N                      → full detail
@@ -411,11 +420,11 @@ Outputs: HTML pages + `public/corpus/reference-table.json` + `public/corpus/mani
 Graded synchronously in `/api/me/task1` and `/api/v1/submit/task1`. Checks submitted colour against `ca1_question_papers.magic_code`. Returns immediately with result. 1 mark if correct, 0 if wrong. Can be resubmitted.
 
 ### Task 2 (word count)
-Async after 202 response:
+Recorded immediately after the 202 response and verified after the exam’s five-minute settlement period:
 1. Verify Apify run: exists, actId matches, status SUCCEEDED, finishedAt within session window
 2. Check dataset contains submitted counts
 3. Compare count_total and count_scoped against frozen expected values from question paper
-4. Fetch actor source, set key_hardcoded flag (feedback only, never graded)
+4. Source inspection is feedback only. It can be unavailable because Apify metadata is not actor source; it never affects marks.
 
 Marks: count_total (1.5) + count_scoped (1.5) + valid run (1.0) = 4.0
 
@@ -428,15 +437,20 @@ Async after 202 response:
 
 Marks: city (2.0) + temperature (3.0) = 5.0
 
-### Deferred submissions
-If Apify or Open-Meteo unreachable → status = 'deferred'. Cron retries every minute. SA can also trigger manually from dashboard (Run verifications now button) or requeue all deferred via dashboard.
+### Delayed verification and results release
+Do not grade a just-submitted Apify run. Apify can briefly report `RUNNING` even after the student’s POST succeeds. The platform treats `READY`, `RUNNING`, `ABORTING`, and `TIMING-OUT` runs as deferred, so they are retried instead of receiving 0 for the run evidence.
+
+For each closed session, wait **five minutes**. Then SA clicks **Show results**. That action runs due verification and releases results only when no Task 2/3 submission remains `pending` or `deferred`. If verification is incomplete, the release is refused and students continue to see no marks or answer sheet.
+
+There is deliberately no Vercel Cron dependency. Vercel Hobby permits only once-daily Cron jobs, so a five-minute schedule would fail deployment. The staff release action is the operational trigger.
 
 ### Collision rules
 | Condition | Action |
 |---|---|
-| Same run_id, same task, different students | Reject second 409 |
-| Same apify_user_id, same task, different students | Reject second 409, flag both |
-| Same student resubmitting | Permitted, upsert, first_submitted_at preserved |
+| Same actor ID, task, session, different API-key owner | Reject second submission with 409 |
+| Same student replaces submission with same or new actor | Permitted while exam is running; latest entry is graded |
+| Submitted actor ID does not match the Apify run | Reject with 409 |
+| Older asynchronous grader finishes after a replacement | Cannot overwrite the latest run’s grade |
 
 ### Break-glass
 SA toggles `relax_apify_verification` on session → Apify checks skipped. Use only if Apify degrades mid-exam.
@@ -454,12 +468,12 @@ setup → registration_open → running → closed → archived
 | setup | Nothing |
 | registration_open | Register, login, generate API key |
 | running | Everything — fetch paper, MCQ, tasks |
-| closed | View results |
-| archived | View results (permanent) |
+| closed | Exam work is locked; results remain hidden until SA releases them |
+| archived | Results remain hidden or visible according to the SA release toggle |
 
 **Key generation** is permitted from `registration_open` — moves the spike out of the 50-minute window.
 
-**Auto-close:** cron closes session when `now > ends_at`.
+**Auto-close:** elapsed sessions are closed when a status or SA route observes `now > ends_at`. SA can also close a running session manually.
 
 **Two sessions** (Batch 1 and Batch 2) are pre-created by migration 003. SA just transitions them — no need to create new ones from dashboard.
 
@@ -637,7 +651,7 @@ Only one session running at a time. Starting a second while first is running ret
 1. **Grade outputs not process.** No human reads code.
 2. **Reference answers frozen at paper issue.** Grading reads `t2_expected_total`, `t2_expected_scoped`, `t3_city`, `t3_lat`, `t3_lon`, `magic_code` from the paper row — never recomputes.
 3. **Zero tolerance on word counts. ±2.0°C on temperature.**
-4. **No draft state.** MCQ per-click. No submit button.
+4. **No draft state.** MCQ saves per-click; Submit Test finalizes all saved answers.
 5. **Ticks on server 200 only.** Never optimistic.
 6. **Resubmission permitted.** 202 pending, marks hidden. No feedback loop.
 7. **Key hardcoding detected, never graded.**
@@ -651,7 +665,7 @@ Only one session running at a time. Starting a second while first is running ret
 
 ## 20. Pre-Exam Checklist
 
-- [ ] All 4 migrations run in Supabase (plus patch if needed)
+- [ ] Migrations 001–010 run in Supabase (009 and 010 are already applied to production)
 - [ ] Two RPC functions added (increment_times_served, increment_times_correct)
 - [ ] SA password hash updated (node scripts/generate-sa-hash.js)
 - [ ] Corpus generated and committed (`npm run generate:corpus`)
@@ -666,7 +680,7 @@ Only one session running at a time. Starting a second while first is running ret
 - [ ] Test Task 1 colour selection
 - [ ] Test mock Task 2 and Task 3 submissions (202 received)
 - [ ] Verify SA live board updates
-- [ ] Test "Run verifications now" button
+- [ ] Close a test session, wait five minutes, then test **Show results**
 - [ ] Brief students: register before exam, generate API key before exam, have Apify account ready with one successful build
 
 ---
@@ -692,8 +706,8 @@ Only one session running at a time. Starting a second while first is running ret
 | 15 | Sheet URL in TASK3_SHEET_CSV_URL env var, never in UI |
 | 16 | Paper fetch: idempotent, repeat returns identical paper |
 | 17 | Paper issued on dashboard button click AND on API call (both idempotent) |
-| 18 | Task resubmission: permitted while running, latest graded, max 10 |
-| 19 | Apify account sharing: first claim wins, second rejected, both flagged |
+| 18 | Task replacement: permitted while running, latest submission graded |
+| 19 | Actor ownership: first API-key owner claims an actor per task/session; another student is rejected |
 | 20 | Key hardcoding: detected, feedback only, never graded |
 | 21 | No outbound email. Staff-mediated password reset |
 | 22 | Table prefix: ca1_ |
@@ -704,4 +718,50 @@ Only one session running at a time. Starting a second while first is running ret
 
 ---
 
-*End of handoff. Project is at v5. Next priority: fix dashboard paper state bug (Issue 1) and run task description SQL (Issue 2).*
+## 22. September 10, 2026 Change Record
+
+This section supersedes any conflicting earlier text in this document.
+
+### Student experience
+
+- The dashboard has separate cards for the API key, number of exams in **My Exams**, the upcoming exam state, and the active exam.
+- **Submit Test** appears only after the student has fetched a paper. It remains available after task submissions, locks MCQ and task answers when used, and does not imply answers are correct.
+- Task and MCQ status uses **Submitted**, never student-facing “Verified” or “Deferred”. A selected Task 1 colour remains highlighted after submission.
+- MCQ answer saves show a prominent saving state while the request is in progress.
+- Dashboard and MCQ fetch effects no longer abort during React cleanup, preventing the prior Next.js `AbortError` overlay.
+- A completed exam’s full answer sheet is in **My Exams**, including MCQ rationale, submitted practical values, marking components, and per-exam marks. It is visible only after SA result release.
+- If no registration or exam is active, the dashboard states that no exam registration has started; it does not show a historic exam as active.
+
+### SA controls and deletion
+
+- The SA student list supports row selection, Select all, and deletion of selected students’ account and exam work. Roster entries are preserved.
+- An SA can delete a setup, closed, or archived exam session without deleting students, roster entries, or API keys.
+- Student-detail marks use the correct maxima: Task 1 = 1, Task 2 = 4, Task 3 = 5. Mark overrides are also bounded to those maxima server-side.
+- SA session cards have **Show results** and **Hide results**. Show results is denied until the session is closed, the five-minute settlement period has elapsed, and all practical verification is complete.
+
+### Practical submissions and Apify
+
+- `X-API-Key` belongs in the request header. Missing, invalid, or revoked keys receive an authentication error.
+- `actor_url` is optional and is no longer shown as a required placeholder. `https://apify.com/YOUR_USERNAME/YOUR_ACTOR_NAME` is documentation text only, never a real value.
+- A student may resubmit a task before closure, including after replacing a broken actor. The one current submission row is updated and the newest submission is graded; all attempts are retained.
+- Each actor is claimed to its first student/API-key owner for that task and session. Another student cannot use it, even after the original owner replaces their submission.
+- The API checks that `actor_id` equals Apify’s `run.actId`. It also preserves the latest-run safeguard, so an older asynchronous grade cannot overwrite a replacement.
+- The Task 2 rubric is visible in the paper: 1.5 whole-corpus count + 1.5 scoped-page count + 1 successful verified Apify run. Task 3 is 2 city + 3 temperature.
+
+### Production database work completed
+
+- Applied migrations 006–010 as required during this development cycle, including actor claims and result release on 10 September 2026.
+- Transactional test data was cleared while retaining the two test students, base exam definition, question bank, tasks, roster, and API keys. Historic audit rows were retained.
+- The tested Task 2 grade was corrected from 3/4 to 4/4 after the run was confirmed as successful within the exam window and its dataset matched the submitted counts. The original loss was a two-second Apify `RUNNING` status race.
+
+### Tomorrow’s operational runbook
+
+For each of the two sessions:
+
+1. Open registration and let students obtain their API keys.
+2. Start the exam and allow students to fetch papers and submit or replace practical answers until closure.
+3. Close the session, then wait at least five minutes.
+4. Click **Show results**. If any submission is still pending, results remain hidden; inspect the SA message and retry after the underlying service is available.
+5. When the release succeeds, students can open **My Exams** to see their answer sheet and marks.
+
+*End of handoff. Project is at v6. The next operational action is deployment of the current validated build before the two sessions.*

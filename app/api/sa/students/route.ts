@@ -99,7 +99,7 @@ export async function GET(req: NextRequest) {
       ca1_api_keys(key_prefix),
       ca1_question_papers(first_fetched_at),
       ca1_submissions(task_no, verification_status, marks_awarded, override_marks),
-      ca1_mcq_assignments(answered_key)
+      ca1_mcq_assignments(answered_key, is_correct)
     `)
 
   if (search) {
