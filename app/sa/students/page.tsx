@@ -5,6 +5,9 @@ import Link from 'next/link'
 
 interface Student {
   id: number
+  session_id: number | null
+  session_label: string | null
+  session_status: string | null
   prn: string
   name: string
   email: string
@@ -193,6 +196,7 @@ export default function SAStudentsPage() {
                 </th>
                 <th className="pb-3 pr-4">PRN</th>
                 <th className="pb-3 pr-4">Name</th>
+                <th className="pb-3 pr-4">Session</th>
                 <th className="pb-3 pr-4 text-center">Key</th>
                 <th className="pb-3 pr-4 text-center">MCQ</th>
                 <th className="pb-3 pr-4 text-center">Paper</th>
@@ -217,6 +221,9 @@ export default function SAStudentsPage() {
                   </td>
                   <td className="py-2.5 pr-4 text-gray-400 font-mono text-xs">{s.prn}</td>
                   <td className="py-2.5 pr-4 text-gray-100 font-medium">{s.name}</td>
+                  <td className="py-2.5 pr-4 text-gray-400 text-xs">
+                    {s.session_label ? <><span className="text-gray-200">{s.session_label}</span><br /><span>{s.session_status}</span></> : 'No exam session'}
+                  </td>
                   <td className="py-2.5 pr-4 text-center">
                     {s.has_key ? <span className="text-green-400 text-xs">✓</span> : <span className="text-gray-600">—</span>}
                   </td>
@@ -236,7 +243,7 @@ export default function SAStudentsPage() {
                     <span className="text-gray-500 text-xs">/15</span>
                   </td>
                   <td className="py-2.5">
-                    <Link href={`/sa/students/${s.id}`} className="text-blue-400 hover:text-blue-300 text-xs">
+                    <Link href={`/sa/students/${s.id}${s.session_id === null ? '' : `?session_id=${s.session_id}`}`} className="text-blue-400 hover:text-blue-300 text-xs">
                       Detail →
                     </Link>
                   </td>

@@ -66,7 +66,6 @@ function QuestionCard({
                 : 'border-gray-200 bg-white hover:border-gray-300 hover:bg-gray-50 text-gray-700'
             }`}
           >
-            <span className="font-mono text-xs font-bold mr-2 text-gray-400">{opt.key}.</span>
             {opt.text}
           </button>
         ))}

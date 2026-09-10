@@ -1,0 +1,1002 @@
+[
+  {
+    "id": "1",
+    "slot_no": 1,
+    "stem": "Which statement best describes the difference between word embeddings and contextual embeddings?",
+    "options": [
+      {
+        "key": "A",
+        "text": "Word embeddings assign the same vector to a token regardless of surrounding text, while contextual embeddings produce different vectors for the same token depending on its context."
+      },
+      {
+        "key": "B",
+        "text": "Word embeddings are always larger in dimension than contextual embeddings, making them more accurate for all natural language tasks."
+      },
+      {
+        "key": "C",
+        "text": "Contextual embeddings are only used for image recognition tasks, while word embeddings handle text classification exclusively."
+      },
+      {
+        "key": "D",
+        "text": "Word embeddings are computed at inference time for every sentence, while contextual embeddings are pre-trained once and remain fixed forever."
+      }
+    ],
+    "correct_key": "A",
+    "correct_answer": "Word embeddings assign the same vector to a token regardless of surrounding text, while contextual embeddings produce different vectors for the same token depending on its context."
+  },
+  {
+    "id": "2",
+    "slot_no": 1,
+    "stem": "A developer notices the word \"bank\" in \"river bank\" and \"savings bank\" receives identical vectors in their system. What type of embedding is most likely in use?",
+    "options": [
+      {
+        "key": "A",
+        "text": "Contextual embedding from a transformer model, because transformers always collapse synonyms into the same vector space."
+      },
+      {
+        "key": "B",
+        "text": "Static word embedding (such as Word2Vec or GloVe), because these assign one fixed vector per token regardless of surrounding context."
+      },
+      {
+        "key": "C",
+        "text": "Sentence-level embedding, because sentence models always ignore individual word meaning in favour of overall tone."
+      },
+      {
+        "key": "D",
+        "text": "Binary embedding, because one-hot encodings produce identical vectors for tokens that appear with similar frequency."
+      }
+    ],
+    "correct_key": "B",
+    "correct_answer": "Static word embedding (such as Word2Vec or GloVe), because these assign one fixed vector per token regardless of surrounding context."
+  },
+  {
+    "id": "3",
+    "slot_no": 1,
+    "stem": "In a RAG pipeline, why are contextual embeddings preferred over static word embeddings for encoding document chunks?",
+    "options": [
+      {
+        "key": "A",
+        "text": "Contextual embeddings are smaller in file size, making the vector store cheaper to host on cloud infrastructure."
+      },
+      {
+        "key": "C",
+        "text": "Contextual embeddings capture meaning that depends on surrounding words, so semantically similar passages map to nearby vectors even when they use different vocabulary."
+      },
+      {
+        "key": "B",
+        "text": "Static word embeddings cannot be stored in vector databases, because those databases require floating-point numbers above a certain precision threshold."
+      },
+      {
+        "key": "D",
+        "text": "Contextual embeddings are generated faster than static embeddings at query time, reducing overall retrieval latency significantly."
+      }
+    ],
+    "correct_key": "C",
+    "correct_answer": "Contextual embeddings capture meaning that depends on surrounding words, so semantically similar passages map to nearby vectors even when they use different vocabulary."
+  },
+  {
+    "id": "4",
+    "slot_no": 1,
+    "stem": "Which of the following is the most accurate description of how contextual embeddings are produced?",
+    "options": [
+      {
+        "key": "A",
+        "text": "A lookup table maps each word to a pre-assigned vector that was set manually by linguistic experts during the model design phase."
+      },
+      {
+        "key": "D",
+        "text": "Each token's vector is computed by the model during a forward pass, taking into account all other tokens in the input sequence at that moment."
+      },
+      {
+        "key": "C",
+        "text": "The entire document is compressed into a single number that represents its overall topic, which is then expanded back to a vector by the retrieval layer."
+      },
+      {
+        "key": "B",
+        "text": "Contextual embeddings are produced by averaging the pixel values of a visual representation of the text rendered in a fixed font size."
+      }
+    ],
+    "correct_key": "D",
+    "correct_answer": "Each token's vector is computed by the model during a forward pass, taking into account all other tokens in the input sequence at that moment."
+  },
+  {
+    "id": "5",
+    "slot_no": 2,
+    "stem": "Why is document chunking necessary before embedding documents for a RAG system?",
+    "options": [
+      {
+        "key": "A",
+        "text": "Embedding models have a maximum input length (context window), so documents longer than that limit must be split into smaller pieces before encoding."
+      },
+      {
+        "key": "B",
+        "text": "Vector databases can only store integers, so text must be broken into single characters before being converted to numeric form."
+      },
+      {
+        "key": "C",
+        "text": "Chunking removes duplicate sentences from the document, which would otherwise cause the cosine similarity score to exceed 1.0."
+      },
+      {
+        "key": "D",
+        "text": "Chunking is required only for images and audio; plain text documents can always be embedded whole without any size constraints."
+      }
+    ],
+    "correct_key": "A",
+    "correct_answer": "Embedding models have a maximum input length (context window), so documents longer than that limit must be split into smaller pieces before encoding."
+  },
+  {
+    "id": "6",
+    "slot_no": 2,
+    "stem": "A team uses very large chunk sizes (e.g. 2000 tokens per chunk) in their RAG system. What is the most likely consequence?",
+    "options": [
+      {
+        "key": "B",
+        "text": "Each chunk covers a broad topic area, so retrieved chunks contain the relevant answer but also carry significant irrelevant content, reducing generation quality."
+      },
+      {
+        "key": "A",
+        "text": "The vector store becomes unable to compute cosine similarity, because large vectors always produce a similarity score of exactly zero."
+      },
+      {
+        "key": "C",
+        "text": "The embedding model automatically truncates each chunk to 10 tokens, discarding the rest without warning the developer."
+      },
+      {
+        "key": "D",
+        "text": "Large chunks improve precision by ensuring every possible answer is always present in at least one retrieved document."
+      }
+    ],
+    "correct_key": "B",
+    "correct_answer": "Each chunk covers a broad topic area, so retrieved chunks contain the relevant answer but also carry significant irrelevant content, reducing generation quality."
+  },
+  {
+    "id": "7",
+    "slot_no": 2,
+    "stem": "What is the trade-off when using very small chunk sizes (e.g. one sentence per chunk) in a RAG pipeline?",
+    "options": [
+      {
+        "key": "C",
+        "text": "Small chunks increase retrieval precision for specific facts but may lose surrounding context that is needed to interpret the retrieved sentence correctly."
+      },
+      {
+        "key": "B",
+        "text": "Small chunks always improve both precision and recall simultaneously, making them the universally optimal choice for all RAG applications."
+      },
+      {
+        "key": "A",
+        "text": "Small chunks cause the embedding model to produce vectors of lower dimensionality, which degrades similarity search across the entire corpus."
+      },
+      {
+        "key": "D",
+        "text": "Small chunks are incompatible with FAISS and other approximate nearest-neighbour indexes, requiring exact search instead."
+      }
+    ],
+    "correct_key": "C",
+    "correct_answer": "Small chunks increase retrieval precision for specific facts but may lose surrounding context that is needed to interpret the retrieved sentence correctly."
+  },
+  {
+    "id": "8",
+    "slot_no": 2,
+    "stem": "Which chunking strategy would best preserve the semantic coherence of each chunk for a document structured with clear headings and sections?",
+    "options": [
+      {
+        "key": "A",
+        "text": "Fixed-size character chunking splits the document every 500 characters regardless of sentence or paragraph boundaries."
+      },
+      {
+        "key": "D",
+        "text": "Structure-aware chunking splits at section boundaries (headings, paragraphs), keeping each section together as one chunk."
+      },
+      {
+        "key": "C",
+        "text": "Random chunking selects arbitrary start and end positions to avoid any bias introduced by document formatting."
+      },
+      {
+        "key": "B",
+        "text": "Token-count chunking always produces the best semantic coherence because it aligns exactly with the embedding model's training distribution."
+      }
+    ],
+    "correct_key": "D",
+    "correct_answer": "Structure-aware chunking splits at section boundaries (headings, paragraphs), keeping each section together as one chunk."
+  },
+  {
+    "id": "9",
+    "slot_no": 3,
+    "stem": "What does a vector database primarily store and index?",
+    "options": [
+      {
+        "key": "A",
+        "text": "High-dimensional numeric vectors (embeddings) along with associated metadata, indexed for fast approximate nearest-neighbour search."
+      },
+      {
+        "key": "B",
+        "text": "Raw text documents stored in B-tree indexes, identical to a relational database but with an additional full-text search column."
+      },
+      {
+        "key": "C",
+        "text": "Binary image files encoded as base-64 strings, with an inverted index mapping pixel intensities to document identifiers."
+      },
+      {
+        "key": "D",
+        "text": "SQL table schemas and foreign key relationships, optimised for join operations across normalised relational tables."
+      }
+    ],
+    "correct_key": "A",
+    "correct_answer": "High-dimensional numeric vectors (embeddings) along with associated metadata, indexed for fast approximate nearest-neighbour search."
+  },
+  {
+    "id": "10",
+    "slot_no": 3,
+    "stem": "Why is a vector database more suitable than a traditional relational database for semantic search?",
+    "options": [
+      {
+        "key": "A",
+        "text": "Relational databases cannot store any numeric data, making them unsuitable for holding floating-point embedding vectors of any dimension."
+      },
+      {
+        "key": "B",
+        "text": "Vector databases provide approximate nearest-neighbour indexes that efficiently find semantically similar items in high-dimensional space, which SQL WHERE clauses cannot do."
+      },
+      {
+        "key": "C",
+        "text": "Traditional relational databases are limited to storing a maximum of 100 rows, making them impractical for document collections of any meaningful size."
+      },
+      {
+        "key": "D",
+        "text": "Vector databases automatically translate natural language queries into SQL, eliminating the need for any query language knowledge."
+      }
+    ],
+    "correct_key": "B",
+    "correct_answer": "Vector databases provide approximate nearest-neighbour indexes that efficiently find semantically similar items in high-dimensional space, which SQL WHERE clauses cannot do."
+  },
+  {
+    "id": "11",
+    "slot_no": 3,
+    "stem": "In a RAG system, at what stage is the vector database queried?",
+    "options": [
+      {
+        "key": "A",
+        "text": "During the fine-tuning phase, to supply training examples that update the LLM's weights based on retrieved document content."
+      },
+      {
+        "key": "C",
+        "text": "At query time, after the user's question is embedded, to retrieve the document chunks whose vectors are most similar to the question vector."
+      },
+      {
+        "key": "B",
+        "text": "During the tokenisation step, to replace rare tokens with semantically equivalent common tokens before the text reaches the model."
+      },
+      {
+        "key": "D",
+        "text": "Only during the initial corpus ingestion phase; once indexing is complete the vector database is no longer accessed."
+      }
+    ],
+    "correct_key": "C",
+    "correct_answer": "At query time, after the user's question is embedded, to retrieve the document chunks whose vectors are most similar to the question vector."
+  },
+  {
+    "id": "12",
+    "slot_no": 3,
+    "stem": "Which of the following is an example of a vector database?",
+    "options": [
+      {
+        "key": "A",
+        "text": "MySQL — a relational database management system with support for ACID transactions and foreign key constraints."
+      },
+      {
+        "key": "D",
+        "text": "Pinecone — a managed vector database designed for storing and querying high-dimensional embedding vectors at scale."
+      },
+      {
+        "key": "C",
+        "text": "Redis — an in-memory key-value store used primarily for caching and session management in web applications."
+      },
+      {
+        "key": "B",
+        "text": "Apache Kafka — a distributed event-streaming platform used for real-time data pipelines and message queuing."
+      }
+    ],
+    "correct_key": "D",
+    "correct_answer": "Pinecone — a managed vector database designed for storing and querying high-dimensional embedding vectors at scale."
+  },
+  {
+    "id": "13",
+    "slot_no": 4,
+    "stem": "What does cosine similarity measure between two vectors?",
+    "options": [
+      {
+        "key": "A",
+        "text": "The angle between two vectors, reflecting how similar their directions are regardless of their individual magnitudes."
+      },
+      {
+        "key": "B",
+        "text": "The straight-line distance between the tips of two vectors measured in Euclidean space, penalising differences in both direction and length."
+      },
+      {
+        "key": "C",
+        "text": "The number of dimensions in which both vectors have identical values, expressed as a percentage of total dimensions."
+      },
+      {
+        "key": "D",
+        "text": "The ratio of the longer vector's magnitude to the shorter vector's magnitude, normalised to a scale between zero and ten."
+      }
+    ],
+    "correct_key": "A",
+    "correct_answer": "The angle between two vectors, reflecting how similar their directions are regardless of their individual magnitudes."
+  },
+  {
+    "id": "14",
+    "slot_no": 4,
+    "stem": "Why is cosine similarity generally preferred over Euclidean distance for comparing text embeddings?",
+    "options": [
+      {
+        "key": "B",
+        "text": "Cosine similarity is insensitive to the magnitude of vectors, so two documents on the same topic score similarly even if one is much longer than the other."
+      },
+      {
+        "key": "A",
+        "text": "Euclidean distance always produces negative values for high-dimensional vectors, making ranking results in ascending order impossible."
+      },
+      {
+        "key": "C",
+        "text": "Cosine similarity can only be computed on binary vectors, making it faster than Euclidean distance for floating-point embeddings."
+      },
+      {
+        "key": "D",
+        "text": "Euclidean distance requires all vectors to have unit norm, a constraint that embedding models cannot satisfy during training."
+      }
+    ],
+    "correct_key": "B",
+    "correct_answer": "Cosine similarity is insensitive to the magnitude of vectors, so two documents on the same topic score similarly even if one is much longer than the other."
+  },
+  {
+    "id": "15",
+    "slot_no": 4,
+    "stem": "Two embeddings have a cosine similarity of 0.95. What does this indicate?",
+    "options": [
+      {
+        "key": "C",
+        "text": "The two texts are highly semantically similar, with their embedding vectors pointing in nearly the same direction in the high-dimensional space."
+      },
+      {
+        "key": "B",
+        "text": "The two texts are completely unrelated, because a score close to 1.0 means the vectors are perpendicular to each other."
+      },
+      {
+        "key": "A",
+        "text": "The embedding model failed to encode the texts correctly, because valid similarity scores must always be negative for natural language."
+      },
+      {
+        "key": "D",
+        "text": "Exactly 95 percent of the tokens in both texts are identical, measured by direct character comparison of the original strings."
+      }
+    ],
+    "correct_key": "C",
+    "correct_answer": "The two texts are highly semantically similar, with their embedding vectors pointing in nearly the same direction in the high-dimensional space."
+  },
+  {
+    "id": "16",
+    "slot_no": 4,
+    "stem": "When would Euclidean distance be preferred over cosine similarity for a vector search task?",
+    "options": [
+      {
+        "key": "D",
+        "text": "When the magnitude of vectors carries meaningful information (e.g. term frequency in a bag-of-words model) and should influence the similarity score."
+      },
+      {
+        "key": "B",
+        "text": "When the vectors are derived from transformer models, because those models always produce unit-norm outputs that break cosine similarity."
+      },
+      {
+        "key": "C",
+        "text": "When the corpus contains fewer than 100 documents, because cosine similarity is undefined for small collections."
+      },
+      {
+        "key": "A",
+        "text": "Euclidean distance is never appropriate for any natural language processing task involving high-dimensional vectors."
+      }
+    ],
+    "correct_key": "D",
+    "correct_answer": "When the magnitude of vectors carries meaningful information (e.g. term frequency in a bag-of-words model) and should influence the similarity score."
+  },
+  {
+    "id": "17",
+    "slot_no": 5,
+    "stem": "Why does retrieval-augmented generation (RAG) produce more accurate answers than simply stuffing an entire knowledge base into the LLM context window?",
+    "options": [
+      {
+        "key": "A",
+        "text": "RAG retrieves only the most relevant passages, keeping the context focused and avoiding the accuracy degradation and cost that come with very long prompts."
+      },
+      {
+        "key": "B",
+        "text": "Context stuffing causes the LLM to rewrite the knowledge base from scratch each time, which introduces random errors not present in the original documents."
+      },
+      {
+        "key": "C",
+        "text": "RAG compresses each document into a single token before sending it to the model, reducing the prompt length without losing any information."
+      },
+      {
+        "key": "D",
+        "text": "Context stuffing is always more accurate than RAG; RAG is only used when the knowledge base is too large to fit in any available context window."
+      }
+    ],
+    "correct_key": "A",
+    "correct_answer": "RAG retrieves only the most relevant passages, keeping the context focused and avoiding the accuracy degradation and cost that come with very long prompts."
+  },
+  {
+    "id": "18",
+    "slot_no": 5,
+    "stem": "A company has a 50,000-page legal document library. Why is context stuffing an impractical strategy for answering queries over this library?",
+    "options": [
+      {
+        "key": "B",
+        "text": "The combined token count of 50,000 pages far exceeds any current LLM context window, and even partial stuffing costs orders of magnitude more than retrieval per query."
+      },
+      {
+        "key": "A",
+        "text": "Legal documents use specialised vocabulary that LLMs are incapable of processing, regardless of how many pages are included in the context."
+      },
+      {
+        "key": "C",
+        "text": "Context stuffing is limited to a maximum of 10 documents per prompt by the OpenAI API terms of service, making large libraries impossible to query."
+      },
+      {
+        "key": "D",
+        "text": "LLMs automatically reject prompts containing legal text because of built-in safety filters that prevent processing of confidential documents."
+      }
+    ],
+    "correct_key": "B",
+    "correct_answer": "The combined token count of 50,000 pages far exceeds any current LLM context window, and even partial stuffing costs orders of magnitude more than retrieval per query."
+  },
+  {
+    "id": "19",
+    "slot_no": 5,
+    "stem": "What is \"context injection\" in a RAG pipeline?",
+    "options": [
+      {
+        "key": "C",
+        "text": "The step where retrieved document chunks are inserted into the LLM prompt alongside the user's question, providing factual grounding for the response."
+      },
+      {
+        "key": "B",
+        "text": "A security attack where a malicious user embeds hidden instructions in a document to override the LLM's system prompt."
+      },
+      {
+        "key": "A",
+        "text": "The process of updating the LLM's weights with new knowledge by running a specialised fine-tuning loop on retrieved documents."
+      },
+      {
+        "key": "D",
+        "text": "A compression algorithm that reduces the size of retrieved chunks by removing stop words before they are sent to the language model."
+      }
+    ],
+    "correct_key": "C",
+    "correct_answer": "The step where retrieved document chunks are inserted into the LLM prompt alongside the user's question, providing factual grounding for the response."
+  },
+  {
+    "id": "20",
+    "slot_no": 5,
+    "stem": "Which of the following is a key limitation of an LLM that RAG is specifically designed to address?",
+    "options": [
+      {
+        "key": "D",
+        "text": "LLMs have a fixed knowledge cutoff date and cannot access information about events or documents that post-date their training, which retrieval from a live knowledge base resolves."
+      },
+      {
+        "key": "B",
+        "text": "LLMs cannot process text longer than 10 tokens, so RAG breaks every query into single words before sending them to the model one at a time."
+      },
+      {
+        "key": "C",
+        "text": "LLMs always output identical responses to identical prompts, and RAG adds randomness by shuffling retrieved chunks before injection."
+      },
+      {
+        "key": "A",
+        "text": "LLMs are unable to generate text in any language other than English, and RAG translates retrieved passages into English before context injection."
+      }
+    ],
+    "correct_key": "D",
+    "correct_answer": "LLMs have a fixed knowledge cutoff date and cannot access information about events or documents that post-date their training, which retrieval from a live knowledge base resolves."
+  },
+  {
+    "id": "21",
+    "slot_no": 6,
+    "stem": "Which sequence correctly describes the components of a RAG pipeline in the order they execute?",
+    "options": [
+      {
+        "key": "A",
+        "text": "LLM generation → vector search → document chunking → embedding → context injection"
+      },
+      {
+        "key": "B",
+        "text": "Document chunking → embedding → vector store indexing → query embedding → vector search → context injection → LLM generation"
+      },
+      {
+        "key": "C",
+        "text": "Context injection → vector store indexing → query embedding → document chunking → LLM generation → embedding"
+      },
+      {
+        "key": "D",
+        "text": "Query embedding → LLM generation → document chunking → vector search → embedding → context injection"
+      }
+    ],
+    "correct_key": "B",
+    "correct_answer": "Document chunking → embedding → vector store indexing → query embedding → vector search → context injection → LLM generation"
+  },
+  {
+    "id": "22",
+    "slot_no": 6,
+    "stem": "In a RAG pipeline, what is the purpose of the retriever component?",
+    "options": [
+      {
+        "key": "A",
+        "text": "The retriever generates the final answer by summarising retrieved passages using a sequence-to-sequence model trained on question-answer pairs."
+      },
+      {
+        "key": "C",
+        "text": "The retriever searches the vector store for the document chunks most semantically similar to the embedded user query and returns them for context injection."
+      },
+      {
+        "key": "B",
+        "text": "The retriever splits raw documents into fixed-size chunks and assigns each chunk a unique integer identifier before embedding begins."
+      },
+      {
+        "key": "D",
+        "text": "The retriever fine-tunes the embedding model on newly added documents to keep the vector representations current with the latest knowledge."
+      }
+    ],
+    "correct_key": "C",
+    "correct_answer": "The retriever searches the vector store for the document chunks most semantically similar to the embedded user query and returns them for context injection."
+  },
+  {
+    "id": "23",
+    "slot_no": 6,
+    "stem": "What distinguishes a RAG system from a system that only uses an LLM without retrieval?",
+    "options": [
+      {
+        "key": "A",
+        "text": "A RAG system augments the LLM's prompt with dynamically retrieved external knowledge at query time, allowing it to answer questions beyond its training data."
+      },
+      {
+        "key": "B",
+        "text": "A RAG system replaces the LLM entirely with a search engine, so no language model is involved in generating the final answer."
+      },
+      {
+        "key": "C",
+        "text": "A RAG system fine-tunes the LLM on every new document as it is added to the knowledge base, keeping the model weights continuously updated."
+      },
+      {
+        "key": "D",
+        "text": "A RAG system limits the LLM to producing outputs of exactly 100 tokens to ensure retrieved context always fits within the response length."
+      }
+    ],
+    "correct_key": "A",
+    "correct_answer": "A RAG system augments the LLM's prompt with dynamically retrieved external knowledge at query time, allowing it to answer questions beyond its training data."
+  },
+  {
+    "id": "24",
+    "slot_no": 6,
+    "stem": "Why is evaluation an important step in a RAG pipeline?",
+    "options": [
+      {
+        "key": "D",
+        "text": "Evaluation measures whether the retriever is returning relevant chunks and whether the LLM is generating accurate, grounded responses, guiding iterative improvement."
+      },
+      {
+        "key": "B",
+        "text": "Evaluation is required by law in all countries before any AI system can be deployed, regardless of the use case or risk level."
+      },
+      {
+        "key": "C",
+        "text": "Evaluation automatically retrains the embedding model when retrieval accuracy falls below a threshold, without any human intervention."
+      },
+      {
+        "key": "A",
+        "text": "Evaluation converts the vector store into a relational database format so that retrieved results can be audited using standard SQL queries."
+      }
+    ],
+    "correct_key": "D",
+    "correct_answer": "Evaluation measures whether the retriever is returning relevant chunks and whether the LLM is generating accurate, grounded responses, guiding iterative improvement."
+  },
+  {
+    "id": "25",
+    "slot_no": 7,
+    "stem": "What is the fundamental difference between a workflow and an AI agent?",
+    "options": [
+      {
+        "key": "A",
+        "text": "A workflow executes a pre-defined sequence of steps determined at design time, while an AI agent autonomously decides its own next action at runtime based on its observations."
+      },
+      {
+        "key": "B",
+        "text": "Workflows can only run on cloud servers, while AI agents are restricted to local machines without internet access."
+      },
+      {
+        "key": "C",
+        "text": "A workflow uses machine learning models for every step, while an AI agent relies exclusively on hard-coded if-else rules with no learned components."
+      },
+      {
+        "key": "D",
+        "text": "AI agents always run faster than workflows because they skip validation steps that workflows require for safety compliance."
+      }
+    ],
+    "correct_key": "A",
+    "correct_answer": "A workflow executes a pre-defined sequence of steps determined at design time, while an AI agent autonomously decides its own next action at runtime based on its observations."
+  },
+  {
+    "id": "26",
+    "slot_no": 7,
+    "stem": "A scheduled Python script runs every night at 2 AM, fetches sales data, and emails a report. Is this an AI agent?",
+    "options": [
+      {
+        "key": "A",
+        "text": "Yes, because it operates automatically without a human pressing a button each time it runs."
+      },
+      {
+        "key": "B",
+        "text": "No, because a schedule is not autonomy — the script's actions are fully determined at design time and no model chooses the next step."
+      },
+      {
+        "key": "C",
+        "text": "Yes, because any script that interacts with external APIs qualifies as an agent under the standard definition."
+      },
+      {
+        "key": "D",
+        "text": "No, but only because it lacks a graphical user interface; adding a dashboard would make it an agent."
+      }
+    ],
+    "correct_key": "B",
+    "correct_answer": "No, because a schedule is not autonomy — the script's actions are fully determined at design time and no model chooses the next step."
+  },
+  {
+    "id": "27",
+    "slot_no": 7,
+    "stem": "For which type of task is a workflow more appropriate than an AI agent?",
+    "options": [
+      {
+        "key": "C",
+        "text": "Extracting a fixed set of fields from invoices and inserting them into a database — a well-defined, repeatable process with no decision-making required at runtime."
+      },
+      {
+        "key": "B",
+        "text": "Researching a novel scientific topic across multiple sources, synthesising findings, and deciding which experiments to prioritise next."
+      },
+      {
+        "key": "A",
+        "text": "Operating a customer support chatbot that must handle unpredictable questions and escalate to a human when it detects frustration."
+      },
+      {
+        "key": "D",
+        "text": "Writing and debugging code autonomously in response to a high-level specification that may change during execution."
+      }
+    ],
+    "correct_key": "C",
+    "correct_answer": "Extracting a fixed set of fields from invoices and inserting them into a database — a well-defined, repeatable process with no decision-making required at runtime."
+  },
+  {
+    "id": "28",
+    "slot_no": 7,
+    "stem": "Which of the following best describes the ReAct (Reason + Act) pattern used in AI agents?",
+    "options": [
+      {
+        "key": "D",
+        "text": "The agent alternates between reasoning steps (thinking about what to do) and action steps (calling tools or APIs), iterating until it reaches a satisfactory answer."
+      },
+      {
+        "key": "B",
+        "text": "The agent reacts to user input by immediately generating the final answer without any intermediate reasoning or tool use."
+      },
+      {
+        "key": "C",
+        "text": "The agent uses a pre-compiled decision tree to map every possible input to a pre-determined output without any runtime computation."
+      },
+      {
+        "key": "A",
+        "text": "The agent runs two separate models in parallel — one for reasoning and one for acting — and combines their outputs using a voting mechanism."
+      }
+    ],
+    "correct_key": "D",
+    "correct_answer": "The agent alternates between reasoning steps (thinking about what to do) and action steps (calling tools or APIs), iterating until it reaches a satisfactory answer."
+  },
+  {
+    "id": "29",
+    "slot_no": 8,
+    "stem": "What is function calling (tool use) in the context of large language models?",
+    "options": [
+      {
+        "key": "A",
+        "text": "A capability that allows an LLM to signal that it wants to invoke a specific external function, with structured arguments, so that the application can execute it and return the result."
+      },
+      {
+        "key": "B",
+        "text": "A Python feature that allows one function to call another function directly inside the LLM's neural network weights during the forward pass."
+      },
+      {
+        "key": "C",
+        "text": "A method for users to manually type function signatures into the chat interface so the LLM learns new skills during the conversation."
+      },
+      {
+        "key": "D",
+        "text": "An API endpoint that replaces the LLM entirely with a deterministic calculator for arithmetic operations, improving numerical accuracy."
+      }
+    ],
+    "correct_key": "A",
+    "correct_answer": "A capability that allows an LLM to signal that it wants to invoke a specific external function, with structured arguments, so that the application can execute it and return the result."
+  },
+  {
+    "id": "30",
+    "slot_no": 8,
+    "stem": "Why are tools essential for agentic AI systems?",
+    "options": [
+      {
+        "key": "B",
+        "text": "Tools extend the agent's capabilities beyond text generation by allowing it to take actions in the real world — searching the web, reading files, calling APIs, or running code."
+      },
+      {
+        "key": "A",
+        "text": "Tools are required because LLMs cannot generate any text without first receiving a structured JSON input from an external tool call."
+      },
+      {
+        "key": "C",
+        "text": "Tools allow the agent to bypass its context window limit by storing the entire conversation history in an external database that replaces the model's memory."
+      },
+      {
+        "key": "D",
+        "text": "Tools are only used during the training phase to generate synthetic data; they are disconnected from the model during inference."
+      }
+    ],
+    "correct_key": "B",
+    "correct_answer": "Tools extend the agent's capabilities beyond text generation by allowing it to take actions in the real world — searching the web, reading files, calling APIs, or running code."
+  },
+  {
+    "id": "31",
+    "slot_no": 8,
+    "stem": "When an LLM invokes a tool using function calling, what happens next in the agent loop?",
+    "options": [
+      {
+        "key": "C",
+        "text": "The application executes the function with the provided arguments, appends the result to the conversation, and sends the updated context back to the LLM for the next step."
+      },
+      {
+        "key": "B",
+        "text": "The LLM executes the function internally within its neural network and generates the result without any involvement from the external application."
+      },
+      {
+        "key": "A",
+        "text": "The conversation ends immediately and the function result is returned directly to the user without the LLM seeing or processing it."
+      },
+      {
+        "key": "D",
+        "text": "The tool call is logged but not executed until a human operator reviews and approves it through a separate approval interface."
+      }
+    ],
+    "correct_key": "C",
+    "correct_answer": "The application executes the function with the provided arguments, appends the result to the conversation, and sends the updated context back to the LLM for the next step."
+  },
+  {
+    "id": "32",
+    "slot_no": 8,
+    "stem": "Which of the following is an example of a tool an AI agent might use?",
+    "options": [
+      {
+        "key": "D",
+        "text": "A web search function that takes a query string as input and returns a list of relevant URLs and snippets from the internet."
+      },
+      {
+        "key": "B",
+        "text": "The softmax activation function applied to the final layer of the transformer to produce probability distributions over the vocabulary."
+      },
+      {
+        "key": "C",
+        "text": "The attention mechanism that allows the model to weigh the importance of different tokens when generating each output token."
+      },
+      {
+        "key": "A",
+        "text": "The tokeniser that converts raw text into integer IDs before they are passed into the model's embedding layer."
+      }
+    ],
+    "correct_key": "D",
+    "correct_answer": "A web search function that takes a query string as input and returns a list of relevant URLs and snippets from the internet."
+  },
+  {
+    "id": "33",
+    "slot_no": 9,
+    "stem": "What is the purpose of a human-in-the-loop mechanism in an AI agent workflow?",
+    "options": [
+      {
+        "key": "A",
+        "text": "It pauses the agent at defined checkpoints so a human can review, approve, or redirect the agent's actions before execution continues, reducing the risk of irreversible errors."
+      },
+      {
+        "key": "B",
+        "text": "It replaces the AI model entirely with a human operator who types responses manually, using the agent framework only for routing messages between users."
+      },
+      {
+        "key": "C",
+        "text": "It ensures the agent runs faster by distributing computation across multiple human reviewers working in parallel on different subtasks."
+      },
+      {
+        "key": "D",
+        "text": "It prevents the agent from accessing the internet by requiring a human to manually copy and paste web content into the context window."
+      }
+    ],
+    "correct_key": "A",
+    "correct_answer": "It pauses the agent at defined checkpoints so a human can review, approve, or redirect the agent's actions before execution continues, reducing the risk of irreversible errors."
+  },
+  {
+    "id": "34",
+    "slot_no": 9,
+    "stem": "In which scenario is a human-in-the-loop workflow most critical?",
+    "options": [
+      {
+        "key": "B",
+        "text": "An agent that autonomously sends emails to thousands of customers on behalf of a company, where an error in tone or content could cause significant reputational damage."
+      },
+      {
+        "key": "A",
+        "text": "An agent that generates draft social media captions for internal review, where a human will always see and approve the output before it is published."
+      },
+      {
+        "key": "C",
+        "text": "An agent that formats a spreadsheet by applying a consistent number format to a column of prices in an offline document."
+      },
+      {
+        "key": "D",
+        "text": "An agent that converts temperature values from Celsius to Fahrenheit using a deterministic mathematical formula with no external API calls."
+      }
+    ],
+    "correct_key": "B",
+    "correct_answer": "An agent that autonomously sends emails to thousands of customers on behalf of a company, where an error in tone or content could cause significant reputational damage."
+  },
+  {
+    "id": "35",
+    "slot_no": 9,
+    "stem": "What is the main trade-off when adding more human-in-the-loop checkpoints to an agent workflow?",
+    "options": [
+      {
+        "key": "C",
+        "text": "More checkpoints increase oversight and reduce error risk, but they slow the workflow down and reduce the autonomy benefit that motivated using an agent in the first place."
+      },
+      {
+        "key": "B",
+        "text": "More checkpoints always improve both speed and accuracy simultaneously, because humans correct model errors faster than the model can make them."
+      },
+      {
+        "key": "A",
+        "text": "More checkpoints are only beneficial when the agent uses more than five tools; workflows with fewer tools should always run fully autonomously."
+      },
+      {
+        "key": "D",
+        "text": "More checkpoints reduce the agent's context window usage, because each approval step clears the conversation history and starts a fresh session."
+      }
+    ],
+    "correct_key": "C",
+    "correct_answer": "More checkpoints increase oversight and reduce error risk, but they slow the workflow down and reduce the autonomy benefit that motivated using an agent in the first place."
+  },
+  {
+    "id": "36",
+    "slot_no": 9,
+    "stem": "Which of the following agent behaviours demonstrates full autonomy (no human in the loop)?",
+    "options": [
+      {
+        "key": "D",
+        "text": "The agent researches, writes, and publishes a blog post directly to the company website without any human reviewing the content before it goes live."
+      },
+      {
+        "key": "B",
+        "text": "The agent drafts a blog post and emails it to a content manager who must click Approve before the post is scheduled for publication."
+      },
+      {
+        "key": "C",
+        "text": "The agent generates an outline and waits for the user to select which sections to expand before proceeding with the full draft."
+      },
+      {
+        "key": "A",
+        "text": "The agent highlights sentences it is uncertain about and flags them for human review before submitting the document to the editor."
+      }
+    ],
+    "correct_key": "D",
+    "correct_answer": "The agent researches, writes, and publishes a blog post directly to the company website without any human reviewing the content before it goes live."
+  },
+  {
+    "id": "37",
+    "slot_no": 10,
+    "stem": "What is short-term memory in an AI agent context?",
+    "options": [
+      {
+        "key": "A",
+        "text": "The current conversation history held in the context window, which is available during an active session but lost when the session ends."
+      },
+      {
+        "key": "B",
+        "text": "A persistent database table that retains all conversations across every user session for the entire lifetime of the application."
+      },
+      {
+        "key": "C",
+        "text": "The model's pre-trained weights, which store knowledge learned during training and remain fixed after deployment."
+      },
+      {
+        "key": "D",
+        "text": "A hardware cache on the GPU that speeds up matrix multiplication during the transformer's attention computation."
+      }
+    ],
+    "correct_key": "A",
+    "correct_answer": "The current conversation history held in the context window, which is available during an active session but lost when the session ends."
+  },
+  {
+    "id": "38",
+    "slot_no": 10,
+    "stem": "Which of the following is an example of long-term memory in an AI agent system?",
+    "options": [
+      {
+        "key": "B",
+        "text": "A vector database that stores summaries of past conversations and retrieves relevant ones at the start of each new session to give the agent historical context."
+      },
+      {
+        "key": "A",
+        "text": "The list of messages in the current API call, passed as the messages array to the LLM endpoint for a single inference request."
+      },
+      {
+        "key": "C",
+        "text": "The KV cache generated by the transformer during the forward pass, storing intermediate attention values for the current prompt."
+      },
+      {
+        "key": "D",
+        "text": "The temperature and top-p parameters set by the developer to control the randomness of the model's output distribution."
+      }
+    ],
+    "correct_key": "B",
+    "correct_answer": "A vector database that stores summaries of past conversations and retrieves relevant ones at the start of each new session to give the agent historical context."
+  },
+  {
+    "id": "39",
+    "slot_no": 10,
+    "stem": "Why does an AI agent need explicit long-term memory mechanisms rather than relying solely on the context window?",
+    "options": [
+      {
+        "key": "C",
+        "text": "Context windows have a finite token limit and are cleared between sessions, so information from past interactions is permanently lost unless actively stored externally."
+      },
+      {
+        "key": "B",
+        "text": "Long-term memory mechanisms are required by law in GDPR-compliant applications to ensure all user data is retained indefinitely."
+      },
+      {
+        "key": "A",
+        "text": "Context windows can only hold a single message at a time, so every response requires a separate database lookup to retrieve the previous message."
+      },
+      {
+        "key": "D",
+        "text": "Long-term memory allows the agent to run faster by pre-computing all possible responses and caching them before the user asks a question."
+      }
+    ],
+    "correct_key": "C",
+    "correct_answer": "Context windows have a finite token limit and are cleared between sessions, so information from past interactions is permanently lost unless actively stored externally."
+  },
+  {
+    "id": "40",
+    "slot_no": 10,
+    "stem": "An agent is helping a user plan a trip over multiple sessions. The user mentioned their dietary restrictions in session 1. In session 3 the agent still remembers this. What mechanism made this possible?",
+    "options": [
+      {
+        "key": "D",
+        "text": "Long-term memory: the dietary restriction was stored in a persistent store after session 1 and retrieved into the context at the start of session 3."
+      },
+      {
+        "key": "B",
+        "text": "Short-term memory: the context window automatically retained all previous sessions without any explicit storage mechanism."
+      },
+      {
+        "key": "C",
+        "text": "Model fine-tuning: the agent's weights were updated after session 1 to permanently encode the user's dietary preferences."
+      },
+      {
+        "key": "A",
+        "text": "Prompt caching: the LLM provider cached the entire session 1 conversation and automatically prepended it to every subsequent API call."
+      }
+    ],
+    "correct_key": "D",
+    "correct_answer": "Long-term memory: the dietary restriction was stored in a persistent store after session 1 and retrieved into the context at the start of session 3."
+  }
+]

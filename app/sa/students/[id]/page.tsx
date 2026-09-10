@@ -1,6 +1,6 @@
 'use client'
 import { useEffect, useState } from 'react'
-import { useParams, useRouter } from 'next/navigation'
+import { useParams, useRouter, useSearchParams } from 'next/navigation'
 import Link from 'next/link'
 import { Alert } from '@/components/ui/Alert'
 
@@ -24,6 +24,18 @@ interface StudentDetail {
   flags: Flag[]
   exceptions: Exception[]
   audit_log: AuditEntry[]
+  sessions: StudentSessionSummary[]
+  selected_session_id: number | null
+}
+
+interface StudentSessionSummary {
+  id: number; label: string; status: string
+  started_at: string | null; ends_at: string | null; created_at: string
+  results_released_at: string | null
+  exam: { code: string; title: string } | null
+  paper_fetched: boolean; mcq_answered: number; mcq_total: number; mcq_marks: number
+  task1_marks: number | null; task2_marks: number | null; task3_marks: number | null
+  total_marks: number
 }
 
 interface McqAssignment {
@@ -166,6 +178,8 @@ function OverrideForm({
 // ─── Main page ────────────────────────────────────────────────
 export default function StudentDetailPage() {
   const { id } = useParams<{ id: string }>()
+  const searchParams = useSearchParams()
+  const sessionId = searchParams.get('session_id')
   const router = useRouter()
   const [data, setData] = useState<StudentDetail | null>(null)
   const [loading, setLoading] = useState(true)
@@ -174,14 +188,15 @@ export default function StudentDetailPage() {
   const [resetting, setResetting] = useState(false)
 
   async function load() {
-    const res = await fetch(`/api/sa/students?id=${id}`)
+    const query = sessionId ? `&session_id=${encodeURIComponent(sessionId)}` : ''
+    const res = await fetch(`/api/sa/students?id=${id}${query}`)
     if (res.status === 401 || res.status === 403) { router.push('/sa/login'); return }
     if (!res.ok) { setError('Student not found.'); setLoading(false); return }
     setData(await res.json())
     setLoading(false)
   }
 
-  useEffect(() => { load() }, [id])
+  useEffect(() => { load() }, [id, sessionId])
 
   async function resetPassword() {
     setResetting(true)
@@ -216,6 +231,46 @@ export default function StudentDetailPage() {
   )
 
   const { student, api_key, paper, mcq_assignments, submissions, attempts, flags, exceptions, audit_log } = data
+
+  if (data.selected_session_id === null) {
+    return (
+      <div className="min-h-screen bg-gray-900 text-white">
+        <header className="bg-gray-800 border-b border-gray-700">
+          <div className="max-w-5xl mx-auto px-4 py-3 flex items-center justify-between">
+            <div>
+              <Link href="/sa/students" className="text-gray-400 hover:text-white text-sm">← Students</Link>
+              <h1 className="mt-2 font-bold text-white">{student.name}</h1>
+              <p className="text-xs text-gray-400">{student.prn} · {student.email}</p>
+            </div>
+            <span className="text-sm text-gray-400">Select an exam session</span>
+          </div>
+        </header>
+        <main className="max-w-5xl mx-auto px-4 py-6 bg-white min-h-screen rounded-t-2xl mt-4 text-gray-900">
+          <SectionHead title="Exam sessions" />
+          {data.sessions.length === 0 ? (
+            <p className="text-sm text-gray-500">No exam session data is recorded for this student.</p>
+          ) : (
+            <div className="space-y-3">
+              {data.sessions.map(session => (
+                <div key={session.id} className="border border-gray-200 rounded-xl p-4 flex flex-wrap items-center justify-between gap-4">
+                  <div>
+                    <p className="text-xs font-medium text-blue-700">{session.exam?.code ?? 'Exam'}</p>
+                    <h2 className="mt-1 font-semibold text-gray-900">{session.exam?.title ?? session.label}</h2>
+                    <p className="mt-1 text-sm text-gray-600">{session.label} · {session.status}</p>
+                  </div>
+                  <div className="flex items-center gap-5 text-sm">
+                    <span><strong>{session.mcq_answered}/{session.mcq_total}</strong> MCQs</span>
+                    <span><strong>{session.total_marks.toFixed(1)}/15</strong></span>
+                    <Link href={`/sa/students/${id}?session_id=${session.id}`} className="btn-primary text-xs">View details →</Link>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </main>
+      </div>
+    )
+  }
 
   const taskMarks = (taskNo: number) => {
     const maxMap: Record<number, number> = { 1: 1, 2: 4, 3: 5 }
