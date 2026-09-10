@@ -83,21 +83,28 @@ export async function POST(req: NextRequest) {
   if (action === 'run_verifications') {
     if (staff.role !== 'sa') return forbidden('Super Admin access required.')
 
+    const { session_id } = body
+
     // Count pending before
-    const { count: before } = await db
+    let beforeQuery = db
       .from('ca1_submissions')
       .select('*', { count: 'exact', head: true })
       .in('verification_status', ['pending', 'deferred'])
+    if (session_id) beforeQuery = beforeQuery.eq('session_id', session_id)
+    const { count: before } = await beforeQuery
 
-    await runPendingVerifications()
+    await runPendingVerifications(session_id)
 
     // Count pending after
-    const { count: after } = await db
+    let afterQuery = db
       .from('ca1_submissions')
       .select('*', { count: 'exact', head: true })
       .in('verification_status', ['pending', 'deferred'])
+    if (session_id) afterQuery = afterQuery.eq('session_id', session_id)
+    const { count: after } = await afterQuery
 
-    await audit(`staff:${staff.email}`, 'manual_verification_run', undefined, {
+    await audit(`staff:${staff.email}`, 'manual_verification_run', session_id ? `session:${session_id}` : undefined, {
+      session_id,
       pending_before: before,
       pending_after: after,
     })

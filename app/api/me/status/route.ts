@@ -2,6 +2,7 @@ import { db } from '@/lib/db'
 import { ok, forbidden } from '@/lib/api'
 import { getSession } from '@/lib/session'
 import { getRelevantStudentSession } from '@/lib/student-session'
+import { closeExpiredSessionsAndVerify } from '@/lib/session-lifecycle'
 
 // Session-cookie version of /api/v1/status — for the student dashboard.
 // The exam API key is never available client-side after generation,
@@ -12,9 +13,15 @@ export async function GET() {
 
   const studentId = session.id
 
+  await closeExpiredSessionsAndVerify()
   const examSession = await getRelevantStudentSession(studentId)
+  // Deadline enforcement is timestamp-based, so students see an ended exam
+  // immediately even when no background scheduler has updated the row yet.
+  const examExpired = examSession?.status === 'running' && !!examSession.ends_at &&
+    new Date(examSession.ends_at) <= new Date()
+  const effectiveStatus = examExpired ? 'closed' : examSession?.status
 
-  const showMarks = examSession?.status === 'closed' || examSession?.status === 'archived'
+  const showMarks = effectiveStatus === 'closed' || effectiveStatus === 'archived'
 
   // MCQ status
   const { data: mcqAssignments } = await db
@@ -75,7 +82,7 @@ export async function GET() {
     : null
 
   return ok({
-    exam_status: examSession?.status ?? 'not_started',
+    exam_status: effectiveStatus ?? 'not_started',
     mcq: {
       answered: mcqAnswered,
       total: 10,

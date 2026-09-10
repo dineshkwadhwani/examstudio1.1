@@ -2,16 +2,34 @@ import { NextRequest } from 'next/server'
 import { db, audit } from '@/lib/db'
 import { ok, err, badRequest, serverError, forbidden } from '@/lib/api'
 import { requireStaff } from '@/lib/session'
+import { verifyAfterManualClose } from '@/lib/session-lifecycle'
 
 // GET — list all sessions
 export async function GET() {
   try {
     await requireStaff()
-    const { data } = await db
-      .from('ca1_exam_sessions')
-      .select('*, ca1_exam_definitions(code, title, corpus_reference_table)')
-      .order('created_at', { ascending: false })
-    return ok(data)
+    const [{ data: sessions }, { data: submissions }] = await Promise.all([
+      db.from('ca1_exam_sessions')
+        .select('*, ca1_exam_definitions(code, title, corpus_reference_table)')
+        .order('created_at', { ascending: false }),
+      db.from('ca1_submissions')
+        .select('session_id, verification_status')
+        .in('task_no', [2, 3]),
+    ])
+
+    const summaries = new Map<number, { total: number; pending: number }>()
+    for (const submission of submissions ?? []) {
+      if (!submission.session_id) continue
+      const summary = summaries.get(submission.session_id) ?? { total: 0, pending: 0 }
+      summary.total++
+      if (submission.verification_status === 'pending' || submission.verification_status === 'deferred') summary.pending++
+      summaries.set(submission.session_id, summary)
+    }
+
+    return ok((sessions ?? []).map(session => {
+      const verification = summaries.get(session.id) ?? { total: 0, pending: 0 }
+      return { ...session, verification: { ...verification, complete: verification.total > 0 && verification.pending === 0 } }
+    }))
   } catch {
     return forbidden()
   }
@@ -201,6 +219,10 @@ export async function POST(req: NextRequest) {
       await db.from('ca1_exam_sessions').update(updates).eq('id', session_id)
       await audit(`staff:${staff.email}`, `session_${new_status ?? 'extended'}`,
         `session:${session_id}`, { reason, extend_minutes, sheet_rows_loaded: sheetRowsLoaded })
+
+      if (new_status === 'closed') {
+        await verifyAfterManualClose(Number(session_id))
+      }
 
       return ok({ message: 'Session updated.', updates })
     }

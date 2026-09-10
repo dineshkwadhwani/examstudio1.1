@@ -225,35 +225,33 @@ export async function gradeTask3(
 }
 
 // ─── Run pending verifications ────────────────────────────────
-export async function runPendingVerifications() {
-  const { data: pending } = await db
+export async function runPendingVerifications(sessionId?: number) {
+  let query = db
     .from('ca1_submissions')
-    .select(`
-      id, student_id, task_no, payload,
-      submitted_run_id, submitted_actor_id, submitted_actor_url,
-      ca1_question_papers!inner(
-        t2_expected_total, t2_expected_scoped,
-        t3_city, t3_lat, t3_lon,
-        session_id
-      )
-    `)
+    .select('id, student_id, session_id, task_no, payload, submitted_run_id, submitted_actor_id, submitted_actor_url')
     .in('verification_status', ['pending', 'deferred'])
     .in('task_no', [2, 3])
     .limit(20)
 
+  if (sessionId) query = query.eq('session_id', sessionId)
+  const { data: pending } = await query
+
   if (!pending?.length) return
 
   for (const sub of pending) {
-    const paper = (sub as Record<string, unknown>).ca1_question_papers as Record<string, unknown>
-    const sessionId = paper.session_id as number
+    const [{ data: paper }, { data: session }] = await Promise.all([
+      db.from('ca1_question_papers')
+        .select('t2_expected_total, t2_expected_scoped, t3_city, t3_lat, t3_lon')
+        .eq('student_id', sub.student_id)
+        .eq('session_id', sub.session_id)
+        .maybeSingle(),
+      db.from('ca1_exam_sessions')
+        .select('*')
+        .eq('id', sub.session_id)
+        .maybeSingle(),
+    ])
 
-    const { data: session } = await db
-      .from('ca1_exam_sessions')
-      .select('*')
-      .eq('id', sessionId)
-      .single()
-
-    if (!session) continue
+    if (!paper || !session) continue
 
     if (sub.task_no === 2) {
       await gradeTask2(

@@ -2,13 +2,18 @@ import { NextRequest } from 'next/server'
 import { db } from '@/lib/db'
 import { resolveApiKey, err, ok } from '@/lib/api'
 import { getRelevantStudentSession } from '@/lib/student-session'
+import { closeExpiredSessionsAndVerify } from '@/lib/session-lifecycle'
 
 export async function GET(req: NextRequest) {
   const resolved = await resolveApiKey(req)
   if (!resolved) return err('unauthorized', 'Valid X-API-Key header required.', 401)
 
   const { studentId } = resolved
+  await closeExpiredSessionsAndVerify()
   const session = await getRelevantStudentSession(studentId)
+  const examExpired = session?.status === 'running' && !!session.ends_at &&
+    new Date(session.ends_at) <= new Date()
+  const effectiveStatus = examExpired ? 'closed' : session?.status
 
   // MCQ status
   const { data: mcqAssignments } = await db
@@ -22,7 +27,7 @@ export async function GET(req: NextRequest) {
 
   // MCQ marks (only after session closed)
   let mcqMarks: number | null = null
-  if (session?.status === 'closed' || session?.status === 'archived') {
+  if (effectiveStatus === 'closed' || effectiveStatus === 'archived') {
     mcqMarks = (mcqAssignments ?? []).filter(a => a.is_correct).length * 0.5
   }
 
@@ -56,7 +61,7 @@ export async function GET(req: NextRequest) {
   for (const sub of (submissions ?? [])) {
     const effectiveMarks = sub.override_marks !== null ? sub.override_marks : sub.marks_awarded
     const showMarks = sub.verification_status === 'verified' &&
-      (session?.status === 'closed' || session?.status === 'archived')
+      (effectiveStatus === 'closed' || effectiveStatus === 'archived')
 
     taskMap[sub.task_no] = {
       submitted: true,
@@ -67,7 +72,7 @@ export async function GET(req: NextRequest) {
     }
   }
 
-  const totalMarks = session?.status === 'closed' || session?.status === 'archived'
+  const totalMarks = effectiveStatus === 'closed' || effectiveStatus === 'archived'
     ? (mcqMarks ?? 0) +
       (taskMap[1].marks ?? 0) +
       (taskMap[2].marks ?? 0) +

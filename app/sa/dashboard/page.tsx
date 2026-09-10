@@ -28,6 +28,7 @@ interface Session {
   closed_at: string | null
   relax_apify_verification: boolean
   sheet_csv_url: string
+  verification: { total: number; pending: number; complete: boolean }
 }
 
 function StatCard({ label, value, sub, color = 'blue' }: {
@@ -120,6 +121,25 @@ export default function SADashboard() {
     setVerifying(false)
     if (res.ok) { setVerifyResult(data); fetchAll() }
     else { setError(data.message ?? 'Failed.') }
+  }
+
+  async function runSessionVerifications(sessionId: number) {
+    setVerifying(true)
+    setMsg('')
+    setError('')
+    const res = await fetch('/api/sa/override', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ action: 'run_verifications', session_id: sessionId }),
+    })
+    const data = await res.json()
+    setVerifying(false)
+    if (res.ok) {
+      setMsg(`Session verification complete: ${data.processed} processed, ${data.pending_after} still pending.`)
+      fetchAll()
+    } else {
+      setError(data.message ?? 'Verification failed.')
+    }
   }
 
   async function requeueDeferred() {
@@ -243,8 +263,8 @@ export default function SADashboard() {
                     {stats?.verification_pending} submission(s) pending verification
                   </p>
                   <p className="text-yellow-400 text-xs mt-1">
-                    The cron job runs every minute automatically.
-                    Use the buttons below if you need to force it now.
+                    Run verification after submissions arrive or when the exam ends.
+                    Re-queue deferred checks after an Apify outage.
                   </p>
                   {verifyResult && (
                     <p className="text-green-400 text-xs mt-2 font-medium">
@@ -384,11 +404,32 @@ export default function SADashboard() {
                     </button>
                   )}
 
+                  {s.verification.pending > 0 && (
+                    <button
+                      onClick={() => runSessionVerifications(s.id)}
+                      disabled={verifying}
+                      className="btn-primary text-xs bg-yellow-600 hover:bg-yellow-700"
+                    >
+                      {verifying ? 'Verifying…' : `Run verification (${s.verification.pending})`}
+                    </button>
+                  )}
+
                   {/* Corpus is in exam definition — always set after migration 003 */}
                   <span className="text-xs px-2 py-1 rounded-md font-medium bg-green-900 text-green-300">
                     Corpus ✓
                   </span>
                 </div>
+
+                <p className={`text-xs mt-3 ${
+                  s.verification.total === 0 ? 'text-gray-500' :
+                  s.verification.complete ? 'text-green-400' : 'text-yellow-400'
+                }`}>
+                  {s.verification.total === 0
+                    ? 'Apify verification: no Task 2 or Task 3 submissions'
+                    : s.verification.complete
+                      ? `Apify verification complete for all ${s.verification.total} submission(s) ✓`
+                      : `Apify verification pending for ${s.verification.pending} of ${s.verification.total} submission(s)`}
+                </p>
               </div>
             ))}
           </div>

@@ -1,9 +1,12 @@
 import { db } from '@/lib/db'
 import { ok, forbidden } from '@/lib/api'
 import { requireStaff } from '@/lib/session'
+import { closeExpiredSessionsAndVerify } from '@/lib/session-lifecycle'
 
 export async function GET() {
   try { await requireStaff() } catch { return forbidden() }
+
+  await closeExpiredSessionsAndVerify()
 
   const { data: session } = await db
     .from('ca1_exam_sessions')
