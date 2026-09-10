@@ -260,6 +260,33 @@ export async function POST(req: NextRequest) {
   }
 }
 
+export async function DELETE(req: NextRequest) {
+  try {
+    const staff = await requireStaff()
+    if (staff.role !== 'sa') return forbidden('Super Admin access required.')
+
+    let body: { session_id?: unknown }
+    try { body = await req.json() } catch { return badRequest('Invalid JSON.') }
+    const sessionId = body.session_id
+    if (typeof sessionId !== 'number' || !Number.isSafeInteger(sessionId) || sessionId <= 0) {
+      return badRequest('session_id must be a positive integer.')
+    }
+
+    const { data, error } = await db.rpc('ca1_delete_exam_session', { p_session_id: sessionId })
+    if (error) {
+      if (error.message.includes('Close the exam')) return badRequest('Close the exam before deleting it.')
+      return serverError('Could not delete the exam.')
+    }
+    if (!data) return err('not_found', 'Exam session not found.', 404)
+
+    await audit(`staff:${staff.email}`, 'exam_session_deleted', 'exam_session', { session_id: sessionId })
+    return ok({ message: 'Exam deleted. Student accounts and roster entries were kept.' })
+  } catch (error) {
+    if (String(error).includes('UNAUTHORIZED')) return forbidden()
+    return serverError('Could not delete the exam.')
+  }
+}
+
 // ─── Helpers ─────────────────────────────────────────────────
 function parseCsvToSnapshot(csv: string): Record<string, unknown> {
   const lines = csv.trim().split('\n')

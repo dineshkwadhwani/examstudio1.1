@@ -173,6 +173,28 @@ export default function SADashboard() {
     fetchAll()
   }
 
+  async function deleteSession(session: Session) {
+    if (!window.confirm(`Delete “${session.label}” and all of its student exam work? Student accounts and roster entries will be kept.`)) return
+    setTransitioning(true)
+    setMsg('')
+    setError('')
+    try {
+      const res = await fetch('/api/sa/session', {
+        method: 'DELETE',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ session_id: session.id }),
+      })
+      const data = await res.json()
+      if (!res.ok) throw new Error(data.message ?? 'Could not delete the exam.')
+      setMsg(data.message)
+      await fetchAll()
+    } catch (error) {
+      setError(error instanceof Error ? error.message : 'Could not delete the exam.')
+    } finally {
+      setTransitioning(false)
+    }
+  }
+
   async function logout() {
     await fetch('/api/auth/logout', { method: 'POST' })
     router.push('/sa/login')
@@ -404,6 +426,11 @@ export default function SADashboard() {
                     <button onClick={() => transition(s.id, 'archived')} disabled={transitioning}
                       className="btn-secondary text-xs">
                       Archive
+                    </button>
+                  )}
+                  {(s.status === 'setup' || s.status === 'closed' || s.status === 'archived') && (
+                    <button onClick={() => deleteSession(s)} disabled={transitioning} className="btn-danger text-xs">
+                      Delete exam
                     </button>
                   )}
 

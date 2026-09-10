@@ -212,7 +212,6 @@ export default function DashboardPage() {
 
   const testSubmitted = !!status?.test_submitted_at
   const examRunning = status?.exam_status === 'running' && !testSubmitted
-  const examClosed = status?.exam_status === 'closed' || status?.exam_status === 'archived'
   const hasKey = !!(keyInfo?.has_key)
   const paperFetched = status?.paper.fetched || !!paper
   const task1 = status?.tasks[1]
@@ -225,6 +224,36 @@ export default function DashboardPage() {
       <div className="text-gray-500 text-sm">Loading…</div>
     </div>
   )
+
+  if (status?.exam_status !== 'running') {
+    const registrationOpen = status?.exam_status === 'registration_open'
+    return (
+      <div className="min-h-screen bg-gray-50">
+        <header className="bg-white border-b border-gray-200">
+          <div className="max-w-4xl mx-auto px-4 py-3 flex items-center justify-between">
+            <div>
+              <h1 className="font-bold text-gray-900 text-base">Exam Studio</h1>
+              <p className="text-xs text-gray-500">Autonomous AI Systems</p>
+            </div>
+            <AccountMenu />
+          </div>
+        </header>
+        <main className="max-w-xl mx-auto px-4 py-12">
+          <div className="card text-center space-y-3">
+            <h2 className="font-semibold text-gray-900">
+              {registrationOpen ? 'Exam scheduled to start' : 'No exam registration has started yet'}
+            </h2>
+            <p className="text-sm text-gray-600">
+              {registrationOpen
+                ? 'Registration is open. Your exam will appear here when the invigilator starts it.'
+                : 'Please check back when the invigilator opens registration.'}
+            </p>
+            <Link href="/my-exams" className="btn-secondary inline-flex text-sm">View My Exams</Link>
+          </div>
+        </main>
+      </div>
+    )
+  }
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -250,7 +279,7 @@ export default function DashboardPage() {
 
       <main className="max-w-4xl mx-auto px-4 py-5 space-y-4">
 
-        {testSubmitted && !examClosed && (
+        {testSubmitted && (
           <div className="card bg-blue-50 border-blue-200 text-center" role="status">
             <h2 className="font-semibold text-blue-900">Test submitted</h2>
             <p className="text-sm text-blue-800 mt-2">Your test has ended and your answers are locked. Results will be available after the exam session closes.</p>
@@ -273,13 +302,6 @@ export default function DashboardPage() {
               <button className="btn-primary mt-3" onClick={() => setConfirmSubmit(true)} disabled={submittingColour}>Submit Test</button>
             )}
             {finishError && <p className="text-sm text-red-600 mt-2" role="alert">{finishError}</p>}
-          </div>
-        )}
-
-        {examClosed && (
-          <div className="card bg-blue-50 border-blue-200 text-center py-4">
-            <p className="font-semibold text-blue-900">Exam has ended</p>
-            <Link href="/results" className="btn-primary mt-3 inline-flex text-sm">View Results →</Link>
           </div>
         )}
 
@@ -357,7 +379,7 @@ export default function DashboardPage() {
         )}
 
         {/* Paper loaded — show all sections */}
-        {paperFetched && !examClosed && !testSubmitted && (
+        {paperFetched && !testSubmitted && (
           <>
             {/* Section A */}
             <div className="card">
@@ -370,9 +392,6 @@ export default function DashboardPage() {
                   <p className={`text-sm font-bold ${status?.mcq.complete ? 'text-green-700' : 'text-gray-700'}`}>
                     {status?.mcq.answered ?? 0} / 10
                   </p>
-                  {status?.mcq.marks !== null && status?.mcq.marks !== undefined && (
-                    <p className="text-xs text-green-700 font-bold">{status.mcq.marks} / 5</p>
-                  )}
                 </div>
               </div>
               {status?.mcq.complete ? (
@@ -445,11 +464,6 @@ export default function DashboardPage() {
                 {(task1?.submitted || colourSubmitted) && (
                   <p className="text-xs text-gray-700 font-medium mt-2">Submitted{(task1?.submitted_colour ?? selectedColour) ? `: ${task1?.submitted_colour ?? selectedColour}` : ''}</p>
                 )}
-                {task1?.marks !== null && task1?.marks !== undefined && examClosed && (
-                  <p className="text-xs font-bold mt-2">
-                    {task1.marks === 1 ? '✓ 1 / 1 mark' : '✗ 0 / 1 mark'}
-                  </p>
-                )}
               </div>
 
               {/* Task 2 */}
@@ -461,9 +475,6 @@ export default function DashboardPage() {
                   </div>
                   <div className="text-right">
                     <StatusBadge submitted={!!task2?.submitted} />
-                    {task2?.marks !== null && task2?.marks !== undefined && examClosed && (
-                      <p className="text-xs font-bold mt-1">{task2.marks} / 4</p>
-                    )}
                   </div>
                 </div>
 
@@ -525,9 +536,6 @@ export default function DashboardPage() {
                   </div>
                   <div className="text-right">
                     <StatusBadge submitted={!!task3?.submitted} />
-                    {task3?.marks !== null && task3?.marks !== undefined && examClosed && (
-                      <p className="text-xs font-bold mt-1">{task3.marks} / 5</p>
-                    )}
                   </div>
                 </div>
 
@@ -582,22 +590,6 @@ export default function DashboardPage() {
             </div>
 
           </>
-        )}
-
-        {examClosed && !status?.final_score_ready && (
-          <div className="card text-center py-5 bg-yellow-50 border-yellow-200">
-            <p className="font-semibold text-yellow-900">Final score is being prepared</p>
-            <p className="text-xs text-yellow-800 mt-1">
-              Your submissions have been recorded. Your final score will appear after grading is complete.
-            </p>
-          </div>
-        )}
-        {status?.total_marks !== null && status?.final_score_ready && examClosed && (
-          <div className="card text-center py-6 bg-gradient-to-br from-blue-50 to-indigo-50 border-blue-200">
-            <p className="text-sm text-blue-600 font-semibold uppercase tracking-wide">Final Score</p>
-            <p className="text-6xl font-bold text-blue-900 mt-2 tabular-nums">{status?.total_marks?.toFixed(1)}</p>
-            <p className="text-blue-500 mt-1">out of 15</p>
-          </div>
         )}
 
       </main>
