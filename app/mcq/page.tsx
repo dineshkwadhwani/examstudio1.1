@@ -86,6 +86,7 @@ export default function McqPage() {
   const [savingSlot, setSavingSlot] = useState<number | null>(null)
   const [savedSlot, setSavedSlot] = useState<number | null>(null)
   const [errorSlot, setErrorSlot] = useState<number | null>(null)
+  const [currentIndex, setCurrentIndex] = useState(0)
 
   useEffect(() => {
     let active = true
@@ -146,7 +147,8 @@ export default function McqPage() {
   }
 
   const answered = questions.filter(q => q.answered_key).length
-  const allAnswered = answered === 10
+  const allAnswered = questions.length > 0 && answered === questions.length
+  const currentQuestion = questions[currentIndex]
 
   if (loading) return (
     <div className="min-h-screen flex items-center justify-center">
@@ -179,7 +181,7 @@ export default function McqPage() {
             <div className="text-center">
               <p className="text-xs text-gray-500">Answered</p>
               <p className={`text-lg font-bold ${allAnswered ? 'text-green-600' : 'text-gray-800'}`}>
-                {answered} / 10
+                {answered} / {questions.length}
               </p>
             </div>
             <Link href="/dashboard" className="btn-secondary text-sm">
@@ -200,35 +202,58 @@ export default function McqPage() {
       )}
 
       <main className="max-w-3xl mx-auto px-4 py-6 space-y-4">
+        <div className="flex items-center justify-between text-sm">
+          <p className="font-semibold text-gray-700">
+            Question {currentIndex + 1} of {questions.length}
+          </p>
+          <p className="text-gray-500">{answered} of {questions.length} answered</p>
+        </div>
+
+        {currentQuestion && (
+          <QuestionCard
+            key={currentQuestion.slot_no}
+            q={currentQuestion}
+            onAnswer={handleAnswer}
+            saving={savingSlot === currentQuestion.slot_no}
+            isSaving={savingSlot !== null}
+            saved={savedSlot === currentQuestion.slot_no}
+            saveError={errorSlot === currentQuestion.slot_no}
+          />
+        )}
+
+        <div className="flex items-center justify-between gap-3">
+          <button
+            type="button"
+            className="btn-secondary"
+            onClick={() => setCurrentIndex(index => Math.max(0, index - 1))}
+            disabled={currentIndex === 0 || savingSlot !== null}
+          >
+            ← Previous
+          </button>
+
+          {currentIndex < questions.length - 1 ? (
+            <button
+              type="button"
+              className="btn-primary"
+              onClick={() => setCurrentIndex(index => Math.min(questions.length - 1, index + 1))}
+              disabled={savingSlot !== null}
+            >
+              Next →
+            </button>
+          ) : (
+            <Link href="/dashboard" className={`btn-primary ${!allAnswered ? 'opacity-60' : ''}`}>
+              {allAnswered ? 'Continue to Section B →' : 'Finish later →'}
+            </Link>
+          )}
+        </div>
+
         {allAnswered && (
           <div className="card bg-green-50 border-green-200 text-center py-4">
-            <p className="text-green-800 font-semibold">All 10 questions answered ✓</p>
+            <p className="text-green-800 font-semibold">All {questions.length} questions answered ✓</p>
             <p className="text-green-700 text-sm mt-1">You can change your answers anytime before the exam ends.</p>
-            <Link href="/dashboard" className="btn-primary mt-3 inline-flex">
-              Continue to Section B →
-            </Link>
           </div>
         )}
 
-        {questions.map(q => (
-          <QuestionCard
-            key={q.slot_no}
-            q={q}
-            onAnswer={handleAnswer}
-            saving={savingSlot === q.slot_no}
-            isSaving={savingSlot !== null}
-            saved={savedSlot === q.slot_no}
-            saveError={errorSlot === q.slot_no}
-          />
-        ))}
-
-        {allAnswered && (
-          <div className="text-center pb-8">
-            <Link href="/dashboard" className="btn-primary">
-              Return to Dashboard →
-            </Link>
-          </div>
-        )}
       </main>
     </div>
   )

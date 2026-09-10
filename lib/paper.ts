@@ -65,14 +65,16 @@ export function shuffleOptions(
   seed: string,
   slotNo: number
 ): string[] {
-  // Deterministic shuffle for this student + slot
-  const slotSeed = seed + ':slot:' + slotNo
-  const keys = options.map(o => o.key)
-  const arr = [...keys]
-  // Fisher-Yates with seeded values from different positions of the hash
+  // Deterministic shuffle for this student + slot. Deriving a fresh digest
+  // for every Fisher-Yates step avoids reusing overlapping portions of the
+  // seed, which can produce visibly repeated permutations.
+  const arr = options.map(o => o.key)
   for (let i = arr.length - 1; i > 0; i--) {
-    const n = parseInt(slotSeed.slice(i * 2, i * 2 + 6) || slotSeed.slice(0, 6), 16)
-    const j = n % (i + 1)
+    const digest = crypto
+      .createHash('sha256')
+      .update(`${seed}:slot:${slotNo}:position:${i}`)
+      .digest('hex')
+    const j = parseInt(digest.slice(0, 12), 16) % (i + 1)
     ;[arr[i], arr[j]] = [arr[j], arr[i]]
   }
   return arr

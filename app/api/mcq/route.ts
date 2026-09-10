@@ -24,7 +24,7 @@ export async function GET() {
   const { data: assignments } = await db
     .from('ca1_mcq_assignments')
     .select(`
-      slot_no, question_id, option_order,
+      id, slot_no, question_id, option_order,
       answered_key, answered_at, change_count, answer_history, is_correct,
       ca1_mcq_questions!inner(
         id, stem, options, correct_key,
@@ -36,7 +36,9 @@ export async function GET() {
     .order('slot_no')
 
   if (assignments && assignments.length === 10) {
-    return ok(formatAssignments(assignments, false))
+    const seed = makeSeed(session.prn, examSession.id)
+    const normalizedAssignments = await normalizeOptionOrders(assignments, seed)
+    return ok(formatAssignments(normalizedAssignments, false))
   }
 
   // First visit — assign questions
@@ -234,4 +236,22 @@ function formatAssignments(assignments: unknown[], showCorrect: boolean) {
       is_correct: showCorrect ? a.is_correct : null,
     }
   })
+}
+
+async function normalizeOptionOrders(assignments: unknown[], seed: string) {
+  return Promise.all((assignments as Record<string, unknown>[]).map(async assignment => {
+    const question = assignment.ca1_mcq_questions as Record<string, unknown>
+    const options = question?.options as { key: string; text: string }[]
+    const expectedOrder = shuffleOptions(options, seed, Number(assignment.slot_no))
+    const currentOrder = assignment.option_order as string[]
+
+    if (JSON.stringify(currentOrder) !== JSON.stringify(expectedOrder) && assignment.id) {
+      await db
+        .from('ca1_mcq_assignments')
+        .update({ option_order: expectedOrder })
+        .eq('id', assignment.id)
+    }
+
+    return { ...assignment, option_order: expectedOrder }
+  }))
 }
