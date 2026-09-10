@@ -1,6 +1,7 @@
 'use client'
+import { PageHeader } from '@/components/student/PageHeader'
+import { AccountMenu } from '@/components/student/AccountMenu'
 import { useEffect, useState } from 'react'
-import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { SaveTick } from '@/components/ui/SaveTick'
 
@@ -77,7 +78,6 @@ function QuestionCard({
 }
 
 export default function McqPage() {
-  const router = useRouter()
   const [questions, setQuestions] = useState<Question[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
@@ -86,22 +86,25 @@ export default function McqPage() {
   const [errorSlot, setErrorSlot] = useState<number | null>(null)
 
   useEffect(() => {
-    fetchQuestions()
-  }, [])
-
-  async function fetchQuestions() {
-    const res = await fetch('/api/mcq')
-    if (res.status === 401 || res.status === 403) {
-      const data = await res.json()
-      setError(data.message ?? 'Access denied.')
-      setLoading(false)
-      return
+    const controller = new AbortController()
+    async function fetchQuestions() {
+      try {
+        const res = await fetch('/api/mcq', { signal: controller.signal })
+        if (!res.ok) {
+          const data = await res.json()
+          setError(data.message ?? 'Failed to load questions.')
+          return
+        }
+        setQuestions(await res.json())
+      } catch {
+        if (!controller.signal.aborted) setError('Failed to load questions. Please refresh to try again.')
+      } finally {
+        if (!controller.signal.aborted) setLoading(false)
+      }
     }
-    if (!res.ok) { setError('Failed to load questions.'); setLoading(false); return }
-    const data = await res.json()
-    setQuestions(data)
-    setLoading(false)
-  }
+    fetchQuestions()
+    return () => controller.abort()
+  }, [])
 
   async function handleAnswer(slotNo: number, key: string) {
     setSavingSlot(slotNo)
@@ -142,24 +145,27 @@ export default function McqPage() {
   )
 
   if (error) return (
+    <>
+    <PageHeader title="Section A — MCQ" />
     <div className="min-h-screen flex items-center justify-center px-4">
       <div className="card max-w-md text-center space-y-3">
         <p className="text-red-600">{error}</p>
         <Link href="/dashboard" className="btn-secondary">← Back to Dashboard</Link>
       </div>
     </div>
+    </>
   )
 
   return (
     <div className="min-h-screen bg-gray-50">
       {/* Header */}
       <header className="bg-white border-b border-gray-200 sticky top-0 z-10">
-        <div className="max-w-3xl mx-auto px-4 py-3 flex items-center justify-between">
+        <div className="max-w-3xl mx-auto px-4 py-3 flex flex-wrap gap-3 items-center justify-between">
           <div>
             <h1 className="font-bold text-gray-900">Section A — MCQ</h1>
             <p className="text-xs text-gray-500">Answers save automatically when you click an option</p>
           </div>
-          <div className="flex items-center gap-4">
+          <div className="ml-auto flex flex-wrap items-center justify-end gap-3">
             <div className="text-center">
               <p className="text-xs text-gray-500">Answered</p>
               <p className={`text-lg font-bold ${allAnswered ? 'text-green-600' : 'text-gray-800'}`}>
@@ -169,6 +175,7 @@ export default function McqPage() {
             <Link href="/dashboard" className="btn-secondary text-sm">
               {allAnswered ? '→ Back to Dashboard' : '← Dashboard'}
             </Link>
+            <AccountMenu />
           </div>
         </div>
       </header>

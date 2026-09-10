@@ -8,30 +8,34 @@ import { verifyAfterManualClose } from '@/lib/session-lifecycle'
 export async function GET() {
   try {
     await requireStaff()
-    const [{ data: sessions }, { data: submissions }] = await Promise.all([
-      db.from('ca1_exam_sessions')
-        .select('*, ca1_exam_definitions(code, title, corpus_reference_table)')
-        .order('created_at', { ascending: false }),
-      db.from('ca1_submissions')
-        .select('session_id, verification_status')
-        .in('task_no', [2, 3]),
-    ])
+    const { data: sessions, error } = await db.from('ca1_exam_sessions')
+      .select('*, ca1_exam_definitions(code, title, corpus_reference_table)')
+      .order('created_at', { ascending: false })
+    if (error) return serverError('Could not load sessions.')
 
-    const summaries = new Map<number, { total: number; pending: number }>()
-    for (const submission of submissions ?? []) {
-      if (!submission.session_id) continue
-      const summary = summaries.get(submission.session_id) ?? { total: 0, pending: 0 }
-      summary.total++
-      if (submission.verification_status === 'pending' || submission.verification_status === 'deferred') summary.pending++
-      summaries.set(submission.session_id, summary)
-    }
-
-    return ok((sessions ?? []).map(session => {
-      const verification = summaries.get(session.id) ?? { total: 0, pending: 0 }
-      return { ...session, verification: { ...verification, complete: verification.total > 0 && verification.pending === 0 } }
+    const results = await Promise.all((sessions ?? []).map(async session => {
+      // Exact counts avoid the row limit on a shared submissions query.
+      const [total, pending] = await Promise.all([
+        db.from('ca1_submissions').select('*', { count: 'exact', head: true })
+          .eq('session_id', session.id).in('task_no', [2, 3]),
+        db.from('ca1_submissions').select('*', { count: 'exact', head: true })
+          .eq('session_id', session.id).in('task_no', [2, 3])
+          .in('verification_status', ['pending', 'deferred']),
+      ])
+      if (total.error || pending.error) throw new Error('Could not load verification status.')
+      return {
+        ...session,
+        verification: {
+          total: total.count ?? 0,
+          pending: pending.count ?? 0,
+          complete: (total.count ?? 0) > 0 && pending.count === 0,
+        },
+      }
     }))
-  } catch {
-    return forbidden()
+    return ok(results)
+  } catch (error) {
+    if (String(error).includes('UNAUTHORIZED')) return forbidden()
+    return serverError('Could not load session verification status.')
   }
 }
 

@@ -39,19 +39,21 @@ export async function resolveApiKey(request: Request): Promise<{
   studentId: number
   prn: string
   name: string
-} | null> {
-  const key = request.headers.get('x-api-key')
-  if (!key) return null
+} | NextResponse> {
+  const key = request.headers.get('x-api-key')?.trim()
+  if (!key) return err('missing_api_key', 'X-API-Key header is missing or empty. Send your exam API key in the X-API-Key header.', 401)
 
   const keyHash = await sha256(key)
 
-  const { data } = await db
+  const { data, error } = await db
     .from('ca1_api_keys')
     .select('student_id, revoked, ca1_students!inner(prn, name)')
     .eq('key_hash', keyHash)
-    .single()
+    .maybeSingle()
 
-  if (!data || data.revoked) return null
+  if (error) return serverError('Could not validate the API key. Please try again later.')
+  if (!data) return err('invalid_api_key', 'The API key in the X-API-Key header is incorrect. Copy your current exam API key from the student dashboard.', 401)
+  if (data.revoked) return err('revoked_api_key', 'This API key has been revoked. Generate a replacement key from the student dashboard.', 401)
 
   const student = (data as Record<string, unknown>).ca1_students as { prn: string; name: string }
   return { studentId: data.student_id, prn: student.prn, name: student.name }

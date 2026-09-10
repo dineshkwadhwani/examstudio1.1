@@ -1,9 +1,9 @@
 'use client'
+import { AccountMenu } from '@/components/student/AccountMenu'
 import { useEffect, useState, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { Countdown } from '@/components/ui/Countdown'
-import { Alert } from '@/components/ui/Alert'
 
 interface TaskStatus {
   submitted: boolean
@@ -11,6 +11,7 @@ interface TaskStatus {
   marks: number | null
   submitted_at: string | null
   attempts: number
+  submitted_colour?: string | null
 }
 
 interface Status {
@@ -54,17 +55,8 @@ const COLOUR_SELECTED: Record<string, string> = {
   Orange: 'bg-orange-500 border-orange-600 text-white',
 }
 
-function StatusBadge({ status }: { status: string | null }) {
-  if (!status) return <span className="badge-gray">Not submitted</span>
-  const map: Record<string, { cls: string; label: string }> = {
-    pending:  { cls: 'badge-yellow', label: 'Pending…' },
-    verified: { cls: 'badge-green',  label: '✓ Verified' },
-    failed:   { cls: 'badge-red',    label: '✗ Failed' },
-    flagged:  { cls: 'badge-red',    label: '⚠ Flagged' },
-    deferred: { cls: 'badge-yellow', label: 'Deferred' },
-  }
-  const m = map[status]
-  return <span className={m?.cls ?? 'badge-gray'}>{m?.label ?? status}</span>
+function StatusBadge({ submitted }: { submitted: boolean }) {
+  return <span className="badge-gray">{submitted ? 'Submitted' : 'Not submitted'}</span>
 }
 
 function Flow({ steps }: { steps: string[] }) {
@@ -118,10 +110,15 @@ export default function DashboardPage() {
   }, [])
 
   useEffect(() => {
-    fetchStatus()
-    fetchKeyInfo()
+    const initialFetch = setTimeout(() => {
+      fetchStatus()
+      fetchKeyInfo()
+    }, 0)
     const id = setInterval(fetchStatus, 8_000)
-    return () => clearInterval(id)
+    return () => {
+      clearTimeout(initialFetch)
+      clearInterval(id)
+    }
   }, [fetchStatus, fetchKeyInfo])
 
   async function generateKey(replace = false) {
@@ -166,7 +163,6 @@ export default function DashboardPage() {
   }
 
   async function submitColour(colour: string) {
-    setSelectedColour(colour)
     setSubmittingColour(true)
     // Submit via API key — use the me endpoint which uses session cookie
     const res = await fetch('/api/me/task1', {
@@ -176,6 +172,7 @@ export default function DashboardPage() {
     })
     setSubmittingColour(false)
     if (res.ok) {
+      setSelectedColour(colour)
       setColourSubmitted(true)
       fetchStatus()
     }
@@ -186,11 +183,6 @@ export default function DashboardPage() {
     await navigator.clipboard.writeText(newKey)
     setCopied(true)
     setTimeout(() => setCopied(false), 2000)
-  }
-
-  async function logout() {
-    await fetch('/api/auth/logout', { method: 'POST' })
-    router.push('/login')
   }
 
   const examRunning = status?.exam_status === 'running'
@@ -213,19 +205,19 @@ export default function DashboardPage() {
 
       {/* Header */}
       <header className="bg-white border-b border-gray-200 sticky top-0 z-10">
-        <div className="max-w-4xl mx-auto px-4 py-3 flex items-center justify-between">
+        <div className="max-w-4xl mx-auto px-4 py-3 flex flex-wrap gap-3 items-center justify-between">
           <div>
             <h1 className="font-bold text-gray-900 text-base">F0003 CA1 — Practical Exam</h1>
             <p className="text-xs text-gray-500">Autonomous AI Systems · 15 marks · 50 minutes</p>
           </div>
-          <div className="flex items-center gap-4">
+          <div className="ml-auto flex flex-wrap items-center justify-end gap-3">
             {status?.exam_ends_at && examRunning && (
               <div className="text-center">
                 <p className="text-xs text-gray-500 mb-0.5">Time remaining</p>
                 <Countdown endsAt={status.exam_ends_at} onExpired={fetchStatus} />
               </div>
             )}
-            <button onClick={logout} className="btn-secondary text-xs py-1.5 px-3">Log out</button>
+            <AccountMenu />
           </div>
         </div>
       </header>
@@ -313,7 +305,7 @@ export default function DashboardPage() {
         )}
 
         {/* Paper loaded — show all sections */}
-        {paperFetched && (
+        {paperFetched && !examClosed && (
           <>
             {/* Section A */}
             <div className="card">
@@ -354,7 +346,7 @@ export default function DashboardPage() {
                   <li>2. Build and run your solution using those resources.</li>
                   <li>3. Check that it produces the required result.</li>
                   <li>4. Send the shown payload to the submission endpoint.</li>
-                  <li className="sm:col-span-2">5. A task is submitted when the endpoint accepts the payload. Tasks 2 and 3 may then show pending verification.</li>
+                  <li className="sm:col-span-2">5. A task shows “Submitted” once the endpoint accepts and records your answer.</li>
                 </ol>
               </div>
 
@@ -365,7 +357,7 @@ export default function DashboardPage() {
                     <h3 className="font-semibold text-gray-800 text-sm">Task 1 — Fetch My Magic Code <span className="text-gray-400 font-normal">(1 mark)</span></h3>
                     <p className="text-xs text-gray-500 mt-1">Use the Exam API to obtain your <code className="bg-gray-100 px-1 rounded font-mono">magic_code</code>, then select that colour below.</p>
                   </div>
-                  <StatusBadge status={task1?.status ?? null} />
+                  <span className="badge-gray">{task1?.submitted || colourSubmitted ? 'Submitted' : 'Not submitted'}</span>
                 </div>
 
                 <div className="grid gap-3 rounded-lg bg-gray-50 p-3 text-xs text-gray-700 mb-3">
@@ -378,18 +370,19 @@ export default function DashboardPage() {
 
                 <div className="grid grid-cols-4 gap-2">
                   {COLOURS.map(colour => {
-                    const isSelected = selectedColour === colour
-                    const alreadySubmitted = task1?.submitted && task1.status === 'verified'
+                    const isSelected = (task1?.submitted_colour ?? selectedColour) === colour
+                    const alreadySubmitted = task1?.submitted || colourSubmitted
                     return (
                       <button
                         key={colour}
+                        aria-pressed={isSelected}
                         onClick={() => !alreadySubmitted && submitColour(colour)}
                         disabled={submittingColour || !!alreadySubmitted || !examRunning}
                         className={`px-3 py-3 rounded-xl border-2 font-semibold text-sm transition-all ${
                           isSelected
-                            ? COLOUR_SELECTED[colour]
-                            : COLOUR_STYLES[colour]
-                        } disabled:opacity-50`}
+                            ? `${COLOUR_SELECTED[colour]} ring-2 ring-offset-2 ring-gray-700`
+                            : `${COLOUR_STYLES[colour]} disabled:opacity-50`
+                        }`}
                       >
                         {colour}
                       </button>
@@ -397,8 +390,8 @@ export default function DashboardPage() {
                   })}
                 </div>
 
-                {colourSubmitted && (
-                  <p className="text-xs text-green-700 font-medium mt-2">✓ Submission accepted and recorded.</p>
+                {(task1?.submitted || colourSubmitted) && (
+                  <p className="text-xs text-gray-700 font-medium mt-2">Submitted{(task1?.submitted_colour ?? selectedColour) ? `: ${task1?.submitted_colour ?? selectedColour}` : ''}</p>
                 )}
                 {task1?.marks !== null && task1?.marks !== undefined && examClosed && (
                   <p className="text-xs font-bold mt-2">
@@ -415,7 +408,7 @@ export default function DashboardPage() {
                     <p className="text-xs text-gray-500 mt-1">Build and deploy an Apify Actor that crawls the corpus and calculates the required word counts.</p>
                   </div>
                   <div className="text-right">
-                    <StatusBadge status={task2?.status ?? null} />
+                    <StatusBadge submitted={!!task2?.submitted} />
                     {task2?.marks !== null && task2?.marks !== undefined && examClosed && (
                       <p className="text-xs font-bold mt-1">{task2.marks} / 4</p>
                     )}
@@ -479,7 +472,7 @@ export default function DashboardPage() {
                     <p className="text-xs text-gray-500 mt-1">Inside your actor, fetch this CSV, find the row matching your PRN, then use that row’s latitude and longitude to call Open-Meteo. <strong>Do not hardcode a location.</strong></p>
                   </div>
                   <div className="text-right">
-                    <StatusBadge status={task3?.status ?? null} />
+                    <StatusBadge submitted={!!task3?.submitted} />
                     {task3?.marks !== null && task3?.marks !== undefined && examClosed && (
                       <p className="text-xs font-bold mt-1">{task3.marks} / 5</p>
                     )}
@@ -514,7 +507,7 @@ export default function DashboardPage() {
                 </div>
 
                 <div className="mt-3 bg-gray-50 rounded-lg p-3 text-xs text-gray-600">
-                  <p className="font-medium mb-1">Submission payload (verification may remain pending after acceptance):</p>
+                  <p className="font-medium mb-1">Submission payload:</p>
                   <code className="block whitespace-pre">{`{
   "city": "<city name from spreadsheet>",
   "temperature_c": <number from Open-Meteo>,
@@ -532,27 +525,27 @@ export default function DashboardPage() {
                   <div><p className="font-semibold">Task 2</p><p>✓ Actor built, deployed, and run</p><p>✓ Required counts obtained</p><p>✓ Submission payload accepted</p></div>
                   <div><p className="font-semibold">Task 3</p><p>✓ PRN matched to spreadsheet row</p><p>✓ Coordinates and temperature obtained</p><p>✓ Submission payload accepted</p></div>
                 </div>
-                <p className="mt-2 text-green-800">For Tasks 2 and 3, “accepted” means your payload was recorded. The verification status may remain pending while the system checks it.</p>
+                <p className="mt-2 text-green-800">“Submitted” means your answer was recorded. Marks will be available after grading is complete.</p>
               </div>
             </div>
 
-            {/* Total marks */}
-            {examClosed && !status?.final_score_ready && (
-              <div className="card text-center py-5 bg-yellow-50 border-yellow-200">
-                <p className="font-semibold text-yellow-900">Final score is being prepared</p>
-                <p className="text-xs text-yellow-800 mt-1">
-                  {status?.verification_pending ?? 0} submission(s) still need verification. Your final score will appear after all checks complete.
-                </p>
-              </div>
-            )}
-            {status?.total_marks !== null && status?.final_score_ready && examClosed && (
-              <div className="card text-center py-6 bg-gradient-to-br from-blue-50 to-indigo-50 border-blue-200">
-                <p className="text-sm text-blue-600 font-semibold uppercase tracking-wide">Final Score</p>
-                <p className="text-6xl font-bold text-blue-900 mt-2 tabular-nums">{status?.total_marks?.toFixed(1)}</p>
-                <p className="text-blue-500 mt-1">out of 15</p>
-              </div>
-            )}
           </>
+        )}
+
+        {examClosed && !status?.final_score_ready && (
+          <div className="card text-center py-5 bg-yellow-50 border-yellow-200">
+            <p className="font-semibold text-yellow-900">Final score is being prepared</p>
+            <p className="text-xs text-yellow-800 mt-1">
+              Your submissions have been recorded. Your final score will appear after grading is complete.
+            </p>
+          </div>
+        )}
+        {status?.total_marks !== null && status?.final_score_ready && examClosed && (
+          <div className="card text-center py-6 bg-gradient-to-br from-blue-50 to-indigo-50 border-blue-200">
+            <p className="text-sm text-blue-600 font-semibold uppercase tracking-wide">Final Score</p>
+            <p className="text-6xl font-bold text-blue-900 mt-2 tabular-nums">{status?.total_marks?.toFixed(1)}</p>
+            <p className="text-blue-500 mt-1">out of 15</p>
+          </div>
         )}
 
       </main>

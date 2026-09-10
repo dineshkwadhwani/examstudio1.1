@@ -31,25 +31,6 @@ interface Session {
   verification: { total: number; pending: number; complete: boolean }
 }
 
-function StatCard({ label, value, sub, color = 'blue' }: {
-  label: string; value: number | string; sub?: string; color?: string
-}) {
-  const colors: Record<string, string> = {
-    blue: 'text-blue-600',
-    green: 'text-green-600',
-    yellow: 'text-yellow-600',
-    red: 'text-red-600',
-    gray: 'text-gray-700',
-  }
-  return (
-    <div className="card text-center">
-      <p className={`text-3xl font-bold ${colors[color]}`}>{value}</p>
-      <p className="text-sm font-medium text-gray-700 mt-1">{label}</p>
-      {sub && <p className="text-xs text-gray-500 mt-0.5">{sub}</p>}
-    </div>
-  )
-}
-
 export default function SADashboard() {
   const router = useRouter()
   const [stats, setStats] = useState<Stats | null>(null)
@@ -71,15 +52,23 @@ export default function SADashboard() {
       router.push('/sa/login')
       return
     }
+    if (!statsRes.ok || !sessionsRes.ok) {
+      setError('Could not refresh session verification status. Please try again.')
+      setLoading(false)
+      return
+    }
     setStats(await statsRes.json())
     setSessions(await sessionsRes.json())
     setLoading(false)
   }, [router])
 
   useEffect(() => {
-    fetchAll()
+    const initialFetch = setTimeout(fetchAll, 0)
     const id = setInterval(fetchAll, 5_000)
-    return () => clearInterval(id)
+    return () => {
+      clearTimeout(initialFetch)
+      clearInterval(id)
+    }
   }, [fetchAll])
 
   async function transition(sessionId: number, newStatus: string) {
@@ -127,18 +116,25 @@ export default function SADashboard() {
     setVerifying(true)
     setMsg('')
     setError('')
-    const res = await fetch('/api/sa/override', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ action: 'run_verifications', session_id: sessionId }),
-    })
-    const data = await res.json()
-    setVerifying(false)
-    if (res.ok) {
-      setMsg(`Session verification complete: ${data.processed} processed, ${data.pending_after} still pending.`)
-      fetchAll()
-    } else {
-      setError(data.message ?? 'Verification failed.')
+    try {
+      const res = await fetch('/api/sa/override', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'run_verifications', session_id: sessionId }),
+      })
+      const data = await res.json()
+      if (!res.ok) {
+        setError(data.message ?? 'Verification failed.')
+        return
+      }
+      setMsg(data.pending_after > 0
+        ? `Verification batch finished: ${data.processed} completed, ${data.pending_after} still pending. Run verification again to continue.`
+        : 'All Apify verifications for this session are complete.')
+      await fetchAll()
+    } catch {
+      setError('Could not run verification. Please try again.')
+    } finally {
+      setVerifying(false)
     }
   }
 
@@ -158,8 +154,11 @@ export default function SADashboard() {
   }
 
   async function createSession() {
-    const { label, exam_id } = newSessionForm
-    if (!label) { setError('Label is required.'); return }
+    setMsg('')
+    setError('')
+    const { exam_id } = newSessionForm
+    const label = newSessionForm.label.trim()
+    if (!label) { setError('Enter a session name, for example “Batch 1 — Div A”.'); return }
     setTransitioning(true)
     const res = await fetch('/api/sa/session', {
       method: 'POST',
@@ -186,7 +185,6 @@ export default function SADashboard() {
   )
 
   const activeSession = sessions.find(s => s.status === 'running')
-  const setupSessions = sessions.filter(s => s.status !== 'archived')
 
   return (
     <div className="min-h-screen bg-gray-900 text-white">
@@ -300,7 +298,11 @@ export default function SADashboard() {
           <div className="flex items-center justify-between mb-3">
             <h2 className="text-sm font-semibold text-gray-400 uppercase tracking-wide">Sessions</h2>
             <button
-              onClick={() => setNewSessionForm(f => ({ ...f, show: !f.show }))}
+              onClick={() => {
+                setMsg('')
+                setError('')
+                setNewSessionForm(f => ({ ...f, show: !f.show }))
+              }}
               className="btn-primary text-xs"
             >
               + New Session
@@ -312,8 +314,8 @@ export default function SADashboard() {
               <h3 className="font-medium text-gray-200 text-sm">Create New Session</h3>
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="label text-gray-400 text-xs">Label (e.g. Batch 1)</label>
-                  <input className="input bg-gray-700 border-gray-600 text-white text-sm"
+                  <label htmlFor="session-name" className="label text-gray-400 text-xs">Session name (required)</label>
+                  <input id="session-name" className="input bg-gray-700 border-gray-600 text-white text-sm"
                     value={newSessionForm.label}
                     onChange={e => setNewSessionForm(f => ({ ...f, label: e.target.value }))}
                     placeholder="Batch 1 — Div A" />
@@ -338,7 +340,7 @@ export default function SADashboard() {
           )}
 
           <div className="space-y-3">
-            {setupSessions.map(s => (
+            {sessions.map(s => (
               <div key={s.id} className="bg-gray-800 border border-gray-700 rounded-xl p-4">
                 <div className="flex items-start justify-between mb-3">
                   <div>
@@ -361,6 +363,17 @@ export default function SADashboard() {
                     </span>
                   </div>
                 </div>
+
+                <p className={`rounded-lg border border-current/30 bg-gray-900/50 p-3 mb-3 text-sm font-medium ${
+                  s.verification.total === 0 ? 'text-gray-300' :
+                  s.verification.complete ? 'text-green-400' : 'text-yellow-400'
+                }`}>
+                  {s.verification.total === 0
+                    ? 'Apify verification: no Task 2 or Task 3 submissions'
+                    : s.verification.complete
+                      ? `Apify verification complete for all ${s.verification.total} submission(s) ✓`
+                      : `Apify verification pending for ${s.verification.pending} of ${s.verification.total} submission(s)`}
+                </p>
 
                 <div className="flex flex-wrap gap-2">
                   {s.status === 'setup' && (
@@ -400,7 +413,7 @@ export default function SADashboard() {
                       onClick={() => toggleApify(s.id)}
                       className={`btn-secondary text-xs ${s.relax_apify_verification ? 'ring-2 ring-yellow-400' : ''}`}
                     >
-                      Apify verification: {s.relax_apify_verification ? '⚠ RELAXED' : 'ON'}
+                      Apify checks: {s.relax_apify_verification ? '⚠ RELAXED' : 'ON'}
                     </button>
                   )}
 
@@ -410,7 +423,7 @@ export default function SADashboard() {
                       disabled={verifying}
                       className="btn-primary text-xs bg-yellow-600 hover:bg-yellow-700"
                     >
-                      {verifying ? 'Verifying…' : `Run verification (${s.verification.pending})`}
+                      {verifying ? 'Verifying…' : `Run Apify verification (${s.verification.pending})`}
                     </button>
                   )}
 
@@ -419,17 +432,6 @@ export default function SADashboard() {
                     Corpus ✓
                   </span>
                 </div>
-
-                <p className={`text-xs mt-3 ${
-                  s.verification.total === 0 ? 'text-gray-500' :
-                  s.verification.complete ? 'text-green-400' : 'text-yellow-400'
-                }`}>
-                  {s.verification.total === 0
-                    ? 'Apify verification: no Task 2 or Task 3 submissions'
-                    : s.verification.complete
-                      ? `Apify verification complete for all ${s.verification.total} submission(s) ✓`
-                      : `Apify verification pending for ${s.verification.pending} of ${s.verification.total} submission(s)`}
-                </p>
               </div>
             ))}
           </div>

@@ -25,7 +25,7 @@ function checkRateLimit(studentId: number): boolean {
 
 export async function GET(req: NextRequest) {
   const resolved = await resolveApiKey(req)
-  if (!resolved) return err('unauthorized', 'Valid X-API-Key header required.', 401)
+  if (resolved instanceof Response) return resolved
 
   const { studentId, prn, name } = resolved
 

@@ -46,7 +46,7 @@ export async function GET() {
   // Submissions
   const { data: submissions } = await db
     .from('ca1_submissions')
-    .select('task_no, verification_status, marks_awarded, override_marks, submitted_at, attempt_count')
+    .select('task_no, verification_status, marks_awarded, override_marks, submitted_at, attempt_count, payload')
     .eq('student_id', studentId)
     .eq('session_id', examSession?.id ?? -1)
 
@@ -57,6 +57,7 @@ export async function GET() {
     marks: number | null
     submitted_at: string | null
     attempts: number
+    submitted_colour?: string | null
   }> = {
     1: { submitted: false, status: null, marks: null, submitted_at: null, attempts: 0 },
     2: { submitted: false, status: null, marks: null, submitted_at: null, attempts: 0 },
@@ -67,10 +68,11 @@ export async function GET() {
     const effective = sub.override_marks !== null ? sub.override_marks : sub.marks_awarded
     taskMap[sub.task_no] = {
       submitted: true,
-      status: sub.verification_status,
+      status: 'submitted',
       marks: showMarks ? effective : null,
       submitted_at: sub.submitted_at,
       attempts: sub.attempt_count,
+      ...(sub.task_no === 1 ? { submitted_colour: sub.payload?.colour ?? null } : {}),
     }
   }
 

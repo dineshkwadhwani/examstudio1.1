@@ -1,0 +1,12 @@
+# Local results may contain student details and submission payloads.
+output/*
+!output/.gitkeep
+
+# Actor dependencies and local Apify storage.
+**/node_modules/
+**/storage/
+**/.venv/
+**/__pycache__/
+
+# Local client where the exam API key is pasted directly.
+actors/task-1/fetch-colour.mjs

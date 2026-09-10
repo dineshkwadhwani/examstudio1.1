@@ -1,4 +1,6 @@
 'use client'
+import { PageHeader } from '@/components/student/PageHeader'
+import { AccountMenu } from '@/components/student/AccountMenu'
 import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
@@ -37,17 +39,6 @@ function MarkBar({ marks, max }: { marks: number | null; max: number }) {
   )
 }
 
-function statusLabel(s: string | null) {
-  const map: Record<string, { cls: string; label: string }> = {
-    pending:  { cls: 'text-yellow-600', label: 'Verification pending…' },
-    verified: { cls: 'text-green-700',  label: '✓ Verified' },
-    failed:   { cls: 'text-red-600',    label: '✗ Failed — 0 marks' },
-    flagged:  { cls: 'text-red-600',    label: '⚠ Flagged for review' },
-    deferred: { cls: 'text-yellow-600', label: 'Deferred — completing shortly' },
-  }
-  if (!s) return { cls: 'text-gray-400', label: 'Not submitted' }
-  return map[s] ?? { cls: 'text-gray-600', label: s }
-}
 
 export default function ResultsPage() {
   const router = useRouter()
@@ -74,6 +65,8 @@ export default function ResultsPage() {
 
   if (!examEnded) {
     return (
+      <>
+      <PageHeader title="Results" />
       <div className="min-h-screen flex items-center justify-center px-4">
         <div className="card max-w-md text-center space-y-4">
           <p className="text-2xl">⏳</p>
@@ -82,6 +75,7 @@ export default function ResultsPage() {
           <Link href="/dashboard" className="btn-secondary">← Back to Dashboard</Link>
         </div>
       </div>
+      </>
     )
   }
 
@@ -97,12 +91,12 @@ export default function ResultsPage() {
     <div className="min-h-screen bg-gray-50">
 
       <header className="bg-white border-b border-gray-200">
-        <div className="max-w-2xl mx-auto px-4 py-4 flex items-center justify-between">
+        <div className="max-w-2xl mx-auto px-4 py-4 flex flex-wrap gap-3 items-center justify-between">
           <div>
             <h1 className="font-bold text-gray-900">F0003 CA1 — Results</h1>
             <p className="text-xs text-gray-500">Autonomous AI Systems and Agent-Based Computing</p>
           </div>
-          <Link href="/dashboard" className="btn-secondary text-sm">Dashboard</Link>
+          <AccountMenu />
         </div>
       </header>
 
@@ -111,8 +105,7 @@ export default function ResultsPage() {
         {pendingVerification && (
           <div className="card bg-yellow-50 border-yellow-200">
             <p className="text-yellow-800 text-sm font-medium">
-              ⏳ {status?.verification_pending ?? 0} submission(s) still need verification.
-              Your final score will appear when all verification is complete. Refresh this page in a minute.
+              Your submissions have been recorded. Your final score will appear after grading is complete. Refresh this page in a minute.
             </p>
           </div>
         )}
@@ -145,7 +138,9 @@ export default function ResultsPage() {
           { no: 2, label: 'Task 2 — Corpus Word Count', max: 3, t: t2 },
           { no: 3, label: 'Task 3 — City Temperature', max: 5, t: t3 },
         ].map(({ no, label, max, t }) => {
-          const sl = statusLabel(t?.status ?? null)
+          const sl = t?.submitted
+            ? { cls: 'text-gray-600', label: 'Submitted' }
+            : { cls: 'text-gray-400', label: 'Not submitted' }
           return (
             <div key={no} className="card">
               <div className="flex items-center justify-between mb-1">

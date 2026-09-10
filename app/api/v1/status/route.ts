@@ -1,12 +1,12 @@
 import { NextRequest } from 'next/server'
 import { db } from '@/lib/db'
-import { resolveApiKey, err, ok } from '@/lib/api'
+import { resolveApiKey, ok } from '@/lib/api'
 import { getRelevantStudentSession } from '@/lib/student-session'
 import { closeExpiredSessionsAndVerify } from '@/lib/session-lifecycle'
 
 export async function GET(req: NextRequest) {
   const resolved = await resolveApiKey(req)
-  if (!resolved) return err('unauthorized', 'Valid X-API-Key header required.', 401)
+  if (resolved instanceof Response) return resolved
 
   const { studentId } = resolved
   await closeExpiredSessionsAndVerify()
@@ -65,7 +65,7 @@ export async function GET(req: NextRequest) {
 
     taskMap[sub.task_no] = {
       submitted: true,
-      status: sub.verification_status,
+      status: 'submitted',
       marks: showMarks ? effectiveMarks : null,
       submitted_at: sub.submitted_at,
       attempts: sub.attempt_count,

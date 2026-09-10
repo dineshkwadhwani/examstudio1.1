@@ -13,7 +13,7 @@ const MAX_ATTEMPTS = 10
 export async function POST(req: NextRequest) {
   // ─── Auth ────────────────────────────────────────────────
   const resolved = await resolveApiKey(req)
-  if (!resolved) return err('unauthorized', 'Valid X-API-Key header required.', 401)
+  if (resolved instanceof Response) return resolved
 
   const { studentId, prn } = resolved
 
