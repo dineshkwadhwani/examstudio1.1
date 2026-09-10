@@ -1,11 +1,12 @@
-import { NextRequest } from 'next/server'
+import type { NextRequest } from 'next/server'
+import { answerWriteError, checkTestOpen } from '@/lib/test-submission'
 import { db, audit } from '@/lib/db'
 import { ok, forbidden, err, serverError, getActiveSession } from '@/lib/api'
 import { getSession } from '@/lib/session'
 import { makeSeed, shuffleOptions, pickQuestion } from '@/lib/paper'
 
 // GET /api/mcq — returns this student's assigned questions
-export async function GET(_req: NextRequest) {
+export async function GET() {
   const session = await getSession()
   if (!session || session.type !== 'student') {
     return forbidden('Must be logged in as a student.')
@@ -15,6 +16,9 @@ export async function GET(_req: NextRequest) {
   if (!examSession) {
     return err('exam_not_started', 'The exam has not started yet.', 403)
   }
+
+  const testError = await checkTestOpen(session.id, examSession.id)
+  if (testError) return testError
 
   // Get existing assignments
   const { data: assignments } = await db
@@ -122,6 +126,9 @@ export async function POST(req: NextRequest) {
     return err('exam_not_started', 'The exam has not started or has ended.', 403)
   }
 
+  const testError = await checkTestOpen(session.id, examSession.id)
+  if (testError) return testError
+
   // Check time
   if (examSession.ends_at && new Date() > new Date(examSession.ends_at)) {
     return err('exam_ended', 'The exam has ended. No further answers accepted.', 403)
@@ -173,7 +180,7 @@ export async function POST(req: NextRequest) {
     ? [...assignment.answer_history, { key: answer_key, at: now }]
     : [{ key: answer_key, at: now }]
 
-  await db.from('ca1_mcq_assignments').update({
+  const { error: saveError } = await db.from('ca1_mcq_assignments').update({
     answered_key: answer_key,
     answered_at: now,
     first_answered_at: assignment.answered_key === null ? now : undefined,
@@ -181,6 +188,7 @@ export async function POST(req: NextRequest) {
     answer_history: history,
     is_correct: isCorrect,
   }).eq('id', assignment.id)
+  if (saveError) return answerWriteError(saveError)
 
   // Update times_correct if this is a new correct answer
   if (isCorrect && assignment.answered_key !== question.correct_key) {

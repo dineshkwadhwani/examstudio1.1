@@ -1,3 +1,4 @@
+import { answerWriteError, checkTestOpen } from '@/lib/test-submission'
 import { NextRequest } from 'next/server'
 import { db, audit } from '@/lib/db'
 import { resolveApiKey, getActiveSession, isWithinWindow, err, ok } from '@/lib/api'
@@ -13,6 +14,10 @@ export async function POST(req: NextRequest) {
   const session = await getActiveSession()
   if (!session) return err('exam_not_started', 'The exam is not currently running.', 403)
   if (!isWithinWindow(session)) return err('exam_ended', 'The exam has ended.', 403)
+
+  const testError = await checkTestOpen(studentId, session.id)
+  if (testError) return testError
+
 
   let body: { colour?: string }
   try { body = await req.json() } catch {
@@ -72,12 +77,14 @@ export async function POST(req: NextRequest) {
   }
 
   if (existing) {
-    await db.from('ca1_submissions').update(submissionData).eq('id', existing.id)
+    const { error } = await db.from('ca1_submissions').update(submissionData).eq('id', existing.id)
+    if (error) return answerWriteError(error)
   } else {
-    await db.from('ca1_submissions').insert({
+    const { error } = await db.from('ca1_submissions').insert({
       ...submissionData,
       first_submitted_at: now,
     })
+    if (error) return answerWriteError(error)
   }
 
   await audit(`student:${prn}`, 'task1_submitted', `student:${studentId}`, {

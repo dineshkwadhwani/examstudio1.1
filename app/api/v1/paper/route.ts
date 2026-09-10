@@ -1,3 +1,4 @@
+import { checkTestOpen } from '@/lib/test-submission'
 import { NextRequest } from 'next/server'
 import { db, audit } from '@/lib/db'
 import {
@@ -36,6 +37,10 @@ export async function GET(req: NextRequest) {
   const session = await getActiveSession()
   if (!session) return err('exam_not_started', 'The exam is not currently running.', 403)
   if (!isWithinWindow(session)) return err('exam_ended', 'The exam has ended.', 403)
+
+  const testError = await checkTestOpen(studentId, session.id)
+  if (testError) return testError
+
 
   // Return existing paper if already issued — fully idempotent
   const { data: existingPaper } = await db

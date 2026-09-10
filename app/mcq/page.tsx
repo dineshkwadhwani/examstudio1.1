@@ -130,6 +130,8 @@ export default function McqPage() {
       )
       setTimeout(() => setSavedSlot(null), 2000)
     } else {
+      const data = await res.json()
+      if (data.error === 'test_submitted') setError(data.message)
       setErrorSlot(slotNo)
       setTimeout(() => setErrorSlot(null), 2000)
     }

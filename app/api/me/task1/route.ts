@@ -1,3 +1,4 @@
+import { answerWriteError, checkTestOpen } from '@/lib/test-submission'
 import { NextRequest } from 'next/server'
 import { db, audit } from '@/lib/db'
 import { ok, forbidden, err } from '@/lib/api'
@@ -23,6 +24,9 @@ export async function POST(req: NextRequest) {
   if (examSession.ends_at && new Date() > new Date(examSession.ends_at)) {
     return err('exam_ended', 'The exam has ended.', 403)
   }
+
+  const testError = await checkTestOpen(studentId, examSession.id)
+  if (testError) return testError
 
   let body: { colour?: string }
   try { body = await req.json() } catch {
@@ -72,9 +76,11 @@ export async function POST(req: NextRequest) {
   }
 
   if (existing) {
-    await db.from('ca1_submissions').update(submissionData).eq('id', existing.id)
+    const { error } = await db.from('ca1_submissions').update(submissionData).eq('id', existing.id)
+    if (error) return answerWriteError(error)
   } else {
-    await db.from('ca1_submissions').insert({ ...submissionData, first_submitted_at: now })
+    const { error } = await db.from('ca1_submissions').insert({ ...submissionData, first_submitted_at: now })
+    if (error) return answerWriteError(error)
   }
 
   await audit(`student:${prn}`, 'task1_submitted', `student:${studentId}`, {

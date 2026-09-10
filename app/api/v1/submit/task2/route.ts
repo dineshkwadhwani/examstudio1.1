@@ -1,8 +1,9 @@
+import { answerWriteError, checkTestOpen } from '@/lib/test-submission'
 import { NextRequest } from 'next/server'
 import { db, audit } from '@/lib/db'
 import {
   resolveApiKey, getActiveSession, isWithinWindow,
-  err, ok, serverError, getSourceIp
+  err, ok, getSourceIp
 } from '@/lib/api'
 import { getRun } from '@/lib/apify'
 import { gradeTask2 } from '@/lib/grading'
@@ -21,6 +22,10 @@ export async function POST(req: NextRequest) {
   const session = await getActiveSession()
   if (!session) return err('exam_not_started', 'The exam is not currently running.', 403)
   if (!isWithinWindow(session)) return err('exam_ended', 'The exam has ended.', 403)
+
+  const testError = await checkTestOpen(studentId, session.id)
+  if (testError) return testError
+
 
   // ─── Parse body ──────────────────────────────────────────
   let body: Partial<Task2Payload>
@@ -134,7 +139,7 @@ export async function POST(req: NextRequest) {
   const now = new Date().toISOString()
 
   // ─── Record attempt ──────────────────────────────────────
-  await db.from('ca1_submission_attempts').insert({
+  const { error: attemptError } = await db.from('ca1_submission_attempts').insert({
     student_id: studentId,
     session_id: session.id,
     task_no: 2,
@@ -145,6 +150,8 @@ export async function POST(req: NextRequest) {
     submitted_at: now,
     source_ip: getSourceIp(req),
   })
+  if (attemptError) return answerWriteError(attemptError)
+
 
   // ─── Upsert submission ───────────────────────────────────
   const upsertData = {
@@ -168,12 +175,14 @@ export async function POST(req: NextRequest) {
   }
 
   if (existing) {
-    await db.from('ca1_submissions').update(upsertData).eq('id', existing.id)
+    const { error } = await db.from('ca1_submissions').update(upsertData).eq('id', existing.id)
+    if (error) return answerWriteError(error)
   } else {
-    await db.from('ca1_submissions').insert({
+    const { error } = await db.from('ca1_submissions').insert({
       ...upsertData,
       first_submitted_at: now,
     })
+    if (error) return answerWriteError(error)
   }
 
   // ─── Get submission ID for grading ──────────────────────

@@ -34,7 +34,7 @@ export async function GET(req: NextRequest) {
   // Paper status
   const { data: paper } = await db
     .from('ca1_question_papers')
-    .select('first_fetched_at, fetch_count')
+    .select('test_submitted_at, first_fetched_at, fetch_count')
     .eq('student_id', studentId)
     .eq('session_id', session?.id ?? -1)
     .maybeSingle()
@@ -85,6 +85,8 @@ export async function GET(req: NextRequest) {
     : null
 
   return ok({
+    session_id: session?.id ?? null,
+    test_submitted_at: paper?.test_submitted_at ?? null,
     mcq: {
       answered: mcqAnswered,
       total: mcqTotal,

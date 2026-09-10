@@ -15,6 +15,8 @@ interface TaskStatus {
 }
 
 interface Status {
+  session_id: number | null
+  test_submitted_at: string | null
   exam_status: string
   mcq: { answered: number; total: number; complete: boolean; marks: number | null }
   paper: { fetched: boolean; first_fetched_at: string | null; fetch_count: number; rendered_paper: Paper | null }
@@ -89,6 +91,9 @@ export default function DashboardPage() {
   const [submittingColour, setSubmittingColour] = useState(false)
   const [colourSubmitted, setColourSubmitted] = useState(false)
   const [loading, setLoading] = useState(true)
+  const [confirmSubmit, setConfirmSubmit] = useState(false)
+  const [finishingTest, setFinishingTest] = useState(false)
+  const [finishError, setFinishError] = useState('')
 
   const fetchStatus = useCallback(async () => {
     const statusRes = await fetch('/api/me/status')
@@ -185,7 +190,28 @@ export default function DashboardPage() {
     setTimeout(() => setCopied(false), 2000)
   }
 
-  const examRunning = status?.exam_status === 'running'
+  async function submitTest() {
+    setFinishingTest(true)
+    setFinishError('')
+    try {
+      const res = await fetch('/api/me/submit-test', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ session_id: status?.session_id }),
+      })
+      const data = await res.json()
+      if (!res.ok) throw new Error(data.message ?? 'Could not submit your test.')
+      setStatus(prev => prev ? { ...prev, test_submitted_at: data.submitted_at } : prev)
+      setConfirmSubmit(false)
+    } catch (error) {
+      setFinishError(error instanceof Error ? error.message : 'Could not submit your test. Please try again.')
+    } finally {
+      setFinishingTest(false)
+    }
+  }
+
+  const testSubmitted = !!status?.test_submitted_at
+  const examRunning = status?.exam_status === 'running' && !testSubmitted
   const examClosed = status?.exam_status === 'closed' || status?.exam_status === 'archived'
   const hasKey = !!(keyInfo?.has_key)
   const paperFetched = status?.paper.fetched || !!paper
@@ -223,6 +249,32 @@ export default function DashboardPage() {
       </header>
 
       <main className="max-w-4xl mx-auto px-4 py-5 space-y-4">
+
+        {testSubmitted && !examClosed && (
+          <div className="card bg-blue-50 border-blue-200 text-center" role="status">
+            <h2 className="font-semibold text-blue-900">Test submitted</h2>
+            <p className="text-sm text-blue-800 mt-2">Your test has ended and your answers are locked. Results will be available after the exam session closes.</p>
+          </div>
+        )}
+
+        {examRunning && paperFetched && (
+          <div className="card">
+            <h2 className="font-semibold text-gray-900">Finish your test</h2>
+            <p className="text-sm text-gray-600 mt-1">Submit your saved answers and end your test. You cannot change answers afterward.</p>
+            {confirmSubmit ? (
+              <div className="mt-3" role="alert">
+                <p className="text-sm text-gray-800">{(status?.mcq.total ?? 10) - (status?.mcq.answered ?? 0)} MCQs unanswered · {[1, 2, 3].filter(no => !status?.tasks[no]?.submitted).length} tasks not submitted. Submit Test now?</p>
+                <div className="flex gap-2 mt-3">
+                  <button className="btn-primary" onClick={submitTest} disabled={finishingTest || submittingColour}>{finishingTest ? 'Submitting…' : 'Submit Test'}</button>
+                  <button className="btn-secondary" onClick={() => setConfirmSubmit(false)} disabled={finishingTest}>Keep working</button>
+                </div>
+              </div>
+            ) : (
+              <button className="btn-primary mt-3" onClick={() => setConfirmSubmit(true)} disabled={submittingColour}>Submit Test</button>
+            )}
+            {finishError && <p className="text-sm text-red-600 mt-2" role="alert">{finishError}</p>}
+          </div>
+        )}
 
         {examClosed && (
           <div className="card bg-blue-50 border-blue-200 text-center py-4">
@@ -305,7 +357,7 @@ export default function DashboardPage() {
         )}
 
         {/* Paper loaded — show all sections */}
-        {paperFetched && !examClosed && (
+        {paperFetched && !examClosed && !testSubmitted && (
           <>
             {/* Section A */}
             <div className="card">

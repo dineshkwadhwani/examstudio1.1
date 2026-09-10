@@ -1,3 +1,4 @@
+import { checkTestOpen } from '@/lib/test-submission'
 import { db } from '@/lib/db'
 import { ok, forbidden, err, serverError } from '@/lib/api'
 import { getSession } from '@/lib/session'
@@ -26,6 +27,9 @@ export async function GET() {
   if (examSession.ends_at && new Date() > new Date(examSession.ends_at)) {
     return err('exam_ended', 'The exam has ended.', 403)
   }
+
+  const testError = await checkTestOpen(studentId, examSession.id)
+  if (testError) return testError
 
   // Return existing paper if already issued
   const { data: existingPaper } = await db
