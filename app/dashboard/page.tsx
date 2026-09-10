@@ -92,6 +92,7 @@ export default function DashboardPage() {
   const [colourSubmitted, setColourSubmitted] = useState(false)
   const [loading, setLoading] = useState(true)
   const [confirmSubmit, setConfirmSubmit] = useState(false)
+  const [showRulesModal, setShowRulesModal] = useState(false)
   const [finishingTest, setFinishingTest] = useState(false)
   const [finishError, setFinishError] = useState('')
   const [examCount, setExamCount] = useState<number | null>(null)
@@ -174,6 +175,7 @@ export default function DashboardPage() {
     setFetchingPaper(false)
     if (!res.ok) { setPaperError(data.message ?? 'Could not fetch paper.'); return }
     setPaper(data)
+    setShowRulesModal(true)
     fetchStatus()
   }
 
@@ -313,6 +315,78 @@ export default function DashboardPage() {
           </div>
         </div>
       </header>
+
+      {showRulesModal && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-gray-900/60 px-4 py-6"
+          role="presentation"
+          onMouseDown={event => {
+            if (event.target === event.currentTarget) setShowRulesModal(false)
+          }}
+        >
+          <div
+            className="w-full max-w-lg rounded-2xl bg-white p-6 shadow-2xl"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="exam-rules-title"
+          >
+            <div className="flex items-start justify-between gap-4">
+              <div>
+                <p className="text-xs font-bold uppercase tracking-wide text-blue-600">Paper fetched</p>
+                <h2 id="exam-rules-title" className="mt-1 text-xl font-bold text-gray-900">Rules and guidelines</h2>
+              </div>
+              <button
+                type="button"
+                className="text-2xl leading-none text-gray-400 hover:text-gray-700"
+                aria-label="Close rules and guidelines"
+                onClick={() => setShowRulesModal(false)}
+              >
+                ×
+              </button>
+            </div>
+
+            <div className="mt-5 space-y-4 text-sm text-gray-700">
+              <section>
+                <h3 className="font-semibold text-gray-900">Distribution of marks</h3>
+                <ul className="mt-1 list-disc space-y-1 pl-5">
+                  <li>Section A — MCQs: 5 marks</li>
+                  <li>Task 1 — Fetch My Magic Code: 1 mark</li>
+                  <li>Task 2 — Corpus Word Count: 4 marks</li>
+                  <li>Task 3 — City Temperature: 5 marks</li>
+                  <li>Total: 15 marks</li>
+                </ul>
+              </section>
+
+              <section>
+                <h3 className="font-semibold text-gray-900">Use only your own credentials and actor</h3>
+                <p className="mt-1">
+                  Use only your own Exam API key and your own Apify actor. Only one actor submission is allowed for each practical task. Do not submit work for another student or share your key or actor; doing so can overwrite the result recorded for your work.
+                </p>
+              </section>
+
+              <section>
+                <h3 className="font-semibold text-gray-900">Submitted does not mean correct</h3>
+                <p className="mt-1">
+                  “Submitted” means that your answer was received and recorded by the system. It does not mean that the answer is correct or that marks have been awarded.
+                </p>
+              </section>
+
+              <section>
+                <h3 className="font-semibold text-gray-900">Results</h3>
+                <p className="mt-1">Your result will be available after the teacher publishes it.</p>
+              </section>
+            </div>
+
+            <button
+              type="button"
+              className="btn-primary mt-6 w-full"
+              onClick={() => setShowRulesModal(false)}
+            >
+              I understand — continue
+            </button>
+          </div>
+        </div>
+      )}
 
       <main className="max-w-4xl mx-auto px-4 py-5 space-y-4">
 
