@@ -1,0 +1,17 @@
+{
+  "crons": [
+    {
+      "path": "/api/cron/verify",
+      "schedule": "*/1 * * * *"
+    }
+  ],
+  "headers": [
+    {
+      "source": "/corpus/(.*)",
+      "headers": [
+        { "key": "Cache-Control", "value": "public, max-age=86400, immutable" },
+        { "key": "Access-Control-Allow-Origin", "value": "*" }
+      ]
+    }
+  ]
+}
