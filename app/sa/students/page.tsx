@@ -43,6 +43,10 @@ export default function SAStudentsPage() {
   const [addingStudent, setAddingStudent] = useState(false)
   const [addMessage, setAddMessage] = useState('')
   const [addError, setAddError] = useState('')
+  const [selectedIds, setSelectedIds] = useState<Set<number>>(new Set())
+  const [deleting, setDeleting] = useState(false)
+  const [deleteMessage, setDeleteMessage] = useState('')
+  const [deleteError, setDeleteError] = useState('')
 
   useEffect(() => {
     fetchStudents()
@@ -51,7 +55,9 @@ export default function SAStudentsPage() {
   async function fetchStudents(q = '') {
     const res = await fetch(`/api/sa/students${q ? `?search=${encodeURIComponent(q)}` : ''}`)
     if (res.status === 401 || res.status === 403) { router.push('/sa/login'); return }
-    setStudents(await res.json())
+    const nextStudents = await res.json() as Student[]
+    setStudents(nextStudents)
+    setSelectedIds(previous => new Set([...previous].filter(id => nextStudents.some(student => student.id === id))))
     setLoading(false)
   }
 
@@ -77,6 +83,48 @@ export default function SAStudentsPage() {
     fetchStudents(search)
   }
 
+  function toggleStudent(studentId: number) {
+    setSelectedIds(previous => {
+      const next = new Set(previous)
+      if (next.has(studentId)) next.delete(studentId)
+      else next.add(studentId)
+      return next
+    })
+  }
+
+  function toggleAllStudents() {
+    setSelectedIds(previous =>
+      previous.size === students.length
+        ? new Set()
+        : new Set(students.map(student => student.id))
+    )
+  }
+
+  async function deleteSelectedStudents() {
+    const count = selectedIds.size
+    if (!count || !window.confirm(`Delete ${count} selected student account${count === 1 ? '' : 's'} and all their exam data? Roster entries will be kept.`)) return
+
+    setDeleting(true)
+    setDeleteMessage('')
+    setDeleteError('')
+    try {
+      const res = await fetch('/api/sa/students/delete', {
+        method: 'DELETE',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ student_ids: [...selectedIds] }),
+      })
+      const data = await res.json()
+      if (!res.ok) throw new Error(data.message ?? 'Could not delete the selected students.')
+      setDeleteMessage(data.message)
+      setSelectedIds(new Set())
+      fetchStudents(search)
+    } catch (error) {
+      setDeleteError(error instanceof Error ? error.message : 'Could not delete the selected students.')
+    } finally {
+      setDeleting(false)
+    }
+  }
+
   if (loading) return (
     <div className="min-h-screen flex items-center justify-center bg-gray-900">
       <div className="text-gray-400">Loading…</div>
@@ -89,6 +137,11 @@ export default function SAStudentsPage() {
         <div className="max-w-7xl mx-auto px-4 py-3 flex items-center justify-between">
           <h1 className="font-bold">Students ({students.length})</h1>
           <div className="flex items-center gap-3">
+            {selectedIds.size > 0 && (
+              <button onClick={deleteSelectedStudents} disabled={deleting} className="rounded-lg bg-red-600 px-3 py-2 text-xs font-medium text-white hover:bg-red-500 disabled:opacity-50">
+                {deleting ? 'Deleting…' : `Delete selected (${selectedIds.size})`}
+              </button>
+            )}
             <button onClick={() => setShowAddStudent(value => !value)} className="btn-primary text-xs">
               + Add student
             </button>
@@ -123,10 +176,21 @@ export default function SAStudentsPage() {
             </div>
           </section>
         )}
+        {deleteMessage && <p className="mb-4 text-sm text-green-400" role="status">{deleteMessage}</p>}
+        {deleteError && <p className="mb-4 text-sm text-red-400" role="alert">{deleteError}</p>}
         <div className="overflow-x-auto">
           <table className="w-full text-sm">
             <thead>
               <tr className="text-left text-gray-400 text-xs uppercase tracking-wide border-b border-gray-700">
+                <th className="pb-3 pr-3">
+                  <input
+                    type="checkbox"
+                    aria-label="Select all students shown"
+                    checked={students.length > 0 && selectedIds.size === students.length}
+                    onChange={toggleAllStudents}
+                    className="h-4 w-4 accent-red-600"
+                  />
+                </th>
                 <th className="pb-3 pr-4">PRN</th>
                 <th className="pb-3 pr-4">Name</th>
                 <th className="pb-3 pr-4 text-center">Key</th>
@@ -142,6 +206,15 @@ export default function SAStudentsPage() {
             <tbody className="divide-y divide-gray-800">
               {students.map(s => (
                 <tr key={s.id} className="hover:bg-gray-800 transition-colors">
+                  <td className="py-2.5 pr-3">
+                    <input
+                      type="checkbox"
+                      aria-label={`Select ${s.name}`}
+                      checked={selectedIds.has(s.id)}
+                      onChange={() => toggleStudent(s.id)}
+                      className="h-4 w-4 accent-red-600"
+                    />
+                  </td>
                   <td className="py-2.5 pr-4 text-gray-400 font-mono text-xs">{s.prn}</td>
                   <td className="py-2.5 pr-4 text-gray-100 font-medium">{s.name}</td>
                   <td className="py-2.5 pr-4 text-center">
