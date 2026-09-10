@@ -323,7 +323,7 @@ export default function DashboardPage() {
           </div>
         )}
 
-        {examRunning && paperFetched && (
+        {examRunning && (
           <div className="card">
             <h2 className="font-semibold text-gray-900">Finish your test</h2>
             <p className="text-sm text-gray-600 mt-1">Submit your saved answers and end your test. You cannot change answers afterward.</p>

@@ -23,12 +23,14 @@ function QuestionCard({
   q,
   onAnswer,
   saving,
+  isSaving,
   saved,
   saveError,
 }: {
   q: Question
   onAnswer: (slotNo: number, key: string) => Promise<void>
   saving: boolean
+  isSaving: boolean
   saved: boolean
   saveError: boolean
 }) {
@@ -41,7 +43,7 @@ function QuestionCard({
           <span className="badge-gray text-xs">L{q.bloom_level} {q.bloom_label}</span>
         </div>
         <div className="flex items-center gap-2">
-          {saving && <span className="text-xs text-gray-500 animate-pulse">Saving…</span>}
+          {saving && <span className="rounded-full bg-blue-100 px-2 py-1 text-xs font-semibold text-blue-800 animate-pulse">⌛ Saving answer…</span>}
           <SaveTick show={saved} />
           <SaveTick show={saveError} error />
           {q.answered_key && !saving && !saved && !saveError && (
@@ -57,7 +59,7 @@ function QuestionCard({
           <button
             key={opt.key}
             onClick={() => onAnswer(q.slot_no, opt.key)}
-            disabled={saving}
+            disabled={isSaving}
             className={`w-full text-left px-4 py-3 rounded-lg border-2 text-sm transition-colors ${
               q.answered_key === opt.key
                 ? 'border-blue-500 bg-blue-50 text-blue-900 font-medium'
@@ -86,24 +88,25 @@ export default function McqPage() {
   const [errorSlot, setErrorSlot] = useState<number | null>(null)
 
   useEffect(() => {
-    const controller = new AbortController()
+    let active = true
     async function fetchQuestions() {
       try {
-        const res = await fetch('/api/mcq', { signal: controller.signal })
+        const res = await fetch('/api/mcq')
         if (!res.ok) {
           const data = await res.json()
-          setError(data.message ?? 'Failed to load questions.')
+          if (active) setError(data.message ?? 'Failed to load questions.')
           return
         }
-        setQuestions(await res.json())
+        const nextQuestions = await res.json()
+        if (active) setQuestions(nextQuestions)
       } catch {
-        if (!controller.signal.aborted) setError('Failed to load questions. Please refresh to try again.')
+        if (active) setError('Failed to load questions. Please refresh to try again.')
       } finally {
-        if (!controller.signal.aborted) setLoading(false)
+        if (active) setLoading(false)
       }
     }
     fetchQuestions()
-    return () => controller.abort()
+    return () => { active = false }
   }, [])
 
   async function handleAnswer(slotNo: number, key: string) {
@@ -111,29 +114,34 @@ export default function McqPage() {
     setSavedSlot(null)
     setErrorSlot(null)
 
-    const res = await fetch('/api/mcq', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ slot_no: slotNo, answer_key: key }),
-    })
+    try {
+      const res = await fetch('/api/mcq', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ slot_no: slotNo, answer_key: key }),
+      })
 
-    setSavingSlot(null)
-
-    if (res.ok) {
-      setSavedSlot(slotNo)
-      setQuestions(prev =>
-        prev.map(q =>
-          q.slot_no === slotNo
-            ? { ...q, answered_key: key, change_count: q.answered_key ? q.change_count + 1 : q.change_count }
-            : q
+      if (res.ok) {
+        setSavedSlot(slotNo)
+        setQuestions(prev =>
+          prev.map(q =>
+            q.slot_no === slotNo
+              ? { ...q, answered_key: key, change_count: q.answered_key ? q.change_count + 1 : q.change_count }
+              : q
+          )
         )
-      )
-      setTimeout(() => setSavedSlot(null), 2000)
-    } else {
-      const data = await res.json()
-      if (data.error === 'test_submitted') setError(data.message)
+        setTimeout(() => setSavedSlot(null), 2000)
+      } else {
+        const data = await res.json()
+        if (data.error === 'test_submitted') setError(data.message)
+        setErrorSlot(slotNo)
+        setTimeout(() => setErrorSlot(null), 2000)
+      }
+    } catch {
       setErrorSlot(slotNo)
       setTimeout(() => setErrorSlot(null), 2000)
+    } finally {
+      setSavingSlot(null)
     }
   }
 
@@ -182,6 +190,15 @@ export default function McqPage() {
         </div>
       </header>
 
+      {savingSlot !== null && (
+        <div className="fixed inset-x-0 top-0 z-30 flex justify-center px-4 pt-4" role="status" aria-live="polite">
+          <div className="rounded-xl border border-blue-300 bg-blue-700 px-5 py-3 text-sm font-semibold text-white shadow-xl">
+            <span className="mr-2 text-lg" aria-hidden="true">⌛</span>
+            Saving your answer for Question {savingSlot}… Please wait.
+          </div>
+        </div>
+      )}
+
       <main className="max-w-3xl mx-auto px-4 py-6 space-y-4">
         {allAnswered && (
           <div className="card bg-green-50 border-green-200 text-center py-4">
@@ -199,6 +216,7 @@ export default function McqPage() {
             q={q}
             onAnswer={handleAnswer}
             saving={savingSlot === q.slot_no}
+            isSaving={savingSlot !== null}
             saved={savedSlot === q.slot_no}
             saveError={errorSlot === q.slot_no}
           />
