@@ -19,6 +19,8 @@ interface Status {
   paper: { fetched: boolean; first_fetched_at: string | null; fetch_count: number; rendered_paper: Paper | null }
   tasks: Record<string, TaskStatus>
   total_marks: number | null
+  final_score_ready: boolean
+  verification_pending: number
   exam_ends_at: string | null
 }
 
@@ -65,6 +67,19 @@ function StatusBadge({ status }: { status: string | null }) {
   return <span className={m?.cls ?? 'badge-gray'}>{m?.label ?? status}</span>
 }
 
+function Flow({ steps }: { steps: string[] }) {
+  return (
+    <div className="flex flex-wrap items-center gap-1.5 text-xs text-indigo-800">
+      {steps.map((step, index) => (
+        <span key={step} className="contents">
+          <span className="bg-indigo-50 border border-indigo-100 rounded px-2 py-1 font-medium">{step}</span>
+          {index < steps.length - 1 && <span className="text-indigo-400">→</span>}
+        </span>
+      ))}
+    </div>
+  )
+}
+
 export default function DashboardPage() {
   const router = useRouter()
   const [status, setStatus] = useState<Status | null>(null)
@@ -84,10 +99,7 @@ export default function DashboardPage() {
   const [loading, setLoading] = useState(true)
 
   const fetchStatus = useCallback(async () => {
-    const [statusRes, keyRes] = await Promise.all([
-      fetch('/api/me/status'),
-      fetch('/api/keys'),
-    ])
+    const statusRes = await fetch('/api/me/status')
     if (statusRes.status === 401 || statusRes.status === 403) {
       router.push('/login')
       return
@@ -97,15 +109,20 @@ export default function DashboardPage() {
       setStatus(nextStatus)
       setPaper(nextStatus.paper.rendered_paper)
     }
-    if (keyRes.ok) setKeyInfo(await keyRes.json())
     setLoading(false)
   }, [router])
 
+  const fetchKeyInfo = useCallback(async () => {
+    const keyRes = await fetch('/api/keys')
+    if (keyRes.ok) setKeyInfo(await keyRes.json())
+  }, [])
+
   useEffect(() => {
     fetchStatus()
+    fetchKeyInfo()
     const id = setInterval(fetchStatus, 8_000)
     return () => clearInterval(id)
-  }, [fetchStatus])
+  }, [fetchStatus, fetchKeyInfo])
 
   async function generateKey(replace = false) {
     setGeneratingKey(true)
@@ -330,19 +347,34 @@ export default function DashboardPage() {
             <div className="card">
               <h2 className="font-semibold text-gray-900 mb-4">Section B — Practical Tasks <span className="text-gray-400 font-normal text-sm">(10 marks)</span></h2>
 
+              <div className="rounded-xl border border-indigo-200 bg-indigo-50 p-4 mb-4">
+                <h3 className="font-semibold text-indigo-950 text-sm">How to complete a practical task</h3>
+                <ol className="mt-2 grid gap-1 text-xs text-indigo-900 sm:grid-cols-2">
+                  <li>1. Read the task requirements and inputs.</li>
+                  <li>2. Build and run your solution using those resources.</li>
+                  <li>3. Check that it produces the required result.</li>
+                  <li>4. Send the shown payload to the submission endpoint.</li>
+                  <li className="sm:col-span-2">5. A task is submitted when the endpoint accepts the payload. Tasks 2 and 3 may then show pending verification.</li>
+                </ol>
+              </div>
+
               {/* Task 1 — Magic Code */}
               <div className="border border-gray-200 rounded-xl p-4 mb-4">
                 <div className="flex items-start justify-between mb-3">
                   <div>
                     <h3 className="font-semibold text-gray-800 text-sm">Task 1 — Fetch My Magic Code <span className="text-gray-400 font-normal">(1 mark)</span></h3>
-                    <p className="text-xs text-gray-500 mt-1">
-                      Call <code className="bg-gray-100 px-1 rounded font-mono">GET {appUrl}/api/v1/paper</code> with your API key.
-                      Your response contains a <code className="bg-gray-100 px-1 rounded font-mono">magic_code</code> field.
-                      Select the colour you received below.
-                    </p>
+                    <p className="text-xs text-gray-500 mt-1">Use the Exam API to obtain your <code className="bg-gray-100 px-1 rounded font-mono">magic_code</code>, then select that colour below.</p>
                   </div>
                   <StatusBadge status={task1?.status ?? null} />
                 </div>
+
+                <div className="grid gap-3 rounded-lg bg-gray-50 p-3 text-xs text-gray-700 mb-3">
+                  <div><p className="font-semibold text-gray-900">Objective</p><p className="mt-0.5">Call the paper API and select the colour named in the <code className="font-mono">magic_code</code> returned by the API.</p></div>
+                  <div><p className="font-semibold text-gray-900">Input / resource</p><p className="mt-0.5">Your Exam API Key, sent with <code className="font-mono">GET {appUrl}/api/v1/paper</code>.</p></div>
+                  <div><p className="font-semibold text-gray-900 mb-1">Workflow</p><Flow steps={['Exam API Key', 'GET /api/v1/paper', 'magic_code', 'Select colour']} /></div>
+                </div>
+
+                <p className="text-xs font-semibold text-gray-800 mb-2">What you submit: Select the colour named in the <code className="font-mono">magic_code</code> returned by the API.</p>
 
                 <div className="grid grid-cols-4 gap-2">
                   {COLOURS.map(colour => {
@@ -366,7 +398,7 @@ export default function DashboardPage() {
                 </div>
 
                 {colourSubmitted && (
-                  <p className="text-xs text-green-700 font-medium mt-2">✓ Answer recorded.</p>
+                  <p className="text-xs text-green-700 font-medium mt-2">✓ Submission accepted and recorded.</p>
                 )}
                 {task1?.marks !== null && task1?.marks !== undefined && examClosed && (
                   <p className="text-xs font-bold mt-2">
@@ -380,7 +412,7 @@ export default function DashboardPage() {
                 <div className="flex items-start justify-between mb-3">
                   <div>
                     <h3 className="font-semibold text-gray-800 text-sm">Task 2 — Corpus Word Count <span className="text-gray-400 font-normal">(4 marks)</span></h3>
-                    <p className="text-xs text-gray-500 mt-1">Build and deploy an Apify actor that crawls the corpus and counts your target word.</p>
+                    <p className="text-xs text-gray-500 mt-1">Build and deploy an Apify Actor that crawls the corpus and calculates the required word counts.</p>
                   </div>
                   <div className="text-right">
                     <StatusBadge status={task2?.status ?? null} />
@@ -412,8 +444,23 @@ export default function DashboardPage() {
                   </div>
                 )}
 
+                <div className="rounded-lg bg-gray-50 p-3 text-xs text-gray-700 mt-3">
+                  <p className="font-semibold text-gray-900">Required workflow</p>
+                  <ol className="mt-1 grid gap-1 sm:grid-cols-2">
+                    <li>1. Build the Actor.</li><li>2. Deploy the Actor.</li>
+                    <li>3. Run it successfully.</li><li>4. Obtain the required counts.</li>
+                    <li className="sm:col-span-2">5. Send the payload to the provided submission endpoint.</li>
+                  </ol>
+                  <p className="font-semibold text-gray-900 mt-3">Required outcome</p>
+                  <ul className="mt-1 space-y-0.5">
+                    <li><code className="font-mono">count_total</code> — total occurrences across the corpus</li>
+                    <li><code className="font-mono">count_scoped</code> — occurrences on your scoped page</li>
+                    <li><code className="font-mono">actor_id</code>, <code className="font-mono">run_id</code>, and <code className="font-mono">actor_url</code> — your deployed Actor and successful run</li>
+                  </ul>
+                </div>
+
                 <div className="mt-3 bg-gray-50 rounded-lg p-3 text-xs text-gray-600">
-                  <p className="font-medium mb-1">POST payload:</p>
+                  <p className="font-medium mb-1">Submission payload (submission is accepted when this endpoint accepts it):</p>
                   <code className="block whitespace-pre">{`{
   "count_total": <whole corpus count>,
   "count_scoped": <page ${paper?.task2.scoped_page ?? '?'} count>,
@@ -429,7 +476,7 @@ export default function DashboardPage() {
                 <div className="flex items-start justify-between mb-3">
                   <div>
                     <h3 className="font-semibold text-gray-800 text-sm">Task 3 — City Temperature <span className="text-gray-400 font-normal">(5 marks)</span></h3>
-                    <p className="text-xs text-gray-500 mt-1">Fetch the spreadsheet, find your PRN row, read lat/lon, call Open-Meteo for temperature.</p>
+                    <p className="text-xs text-gray-500 mt-1">Inside your actor, fetch this CSV, find the row matching your PRN, then use that row’s latitude and longitude to call Open-Meteo. <strong>Do not hardcode a location.</strong></p>
                   </div>
                   <div className="text-right">
                     <StatusBadge status={task3?.status ?? null} />
@@ -453,8 +500,21 @@ export default function DashboardPage() {
                   </div>
                 )}
 
+                <div className="rounded-lg bg-gray-50 p-3 text-xs text-gray-700 mt-3">
+                  <p className="font-semibold text-gray-900">Inputs / resources</p>
+                  <p className="mt-1">Your PRN, the Spreadsheet CSV URL above, Open-Meteo, and the submission endpoint.</p>
+                  <p className="font-semibold text-gray-900 mt-3 mb-1">Workflow</p>
+                  <Flow steps={['Your PRN', 'Find spreadsheet row', 'Latitude + longitude', 'Open-Meteo', 'Temperature', 'Submit result']} />
+                  <p className="font-semibold text-gray-900 mt-3">Required outcome</p>
+                  <ul className="mt-1 space-y-0.5">
+                    <li><code className="font-mono">city</code> — city from the spreadsheet row matching your PRN</li>
+                    <li><code className="font-mono">temperature_c</code> — temperature obtained from Open-Meteo</li>
+                    <li><code className="font-mono">actor_id</code>, <code className="font-mono">run_id</code>, and <code className="font-mono">actor_url</code> — your deployed Actor and successful run</li>
+                  </ul>
+                </div>
+
                 <div className="mt-3 bg-gray-50 rounded-lg p-3 text-xs text-gray-600">
-                  <p className="font-medium mb-1">POST payload:</p>
+                  <p className="font-medium mb-1">Submission payload (verification may remain pending after acceptance):</p>
                   <code className="block whitespace-pre">{`{
   "city": "<city name from spreadsheet>",
   "temperature_c": <number from Open-Meteo>,
@@ -464,10 +524,28 @@ export default function DashboardPage() {
 }`}</code>
                 </div>
               </div>
+
+              <div className="rounded-xl border border-green-200 bg-green-50 p-4 mt-4 text-xs text-green-950">
+                <h3 className="font-semibold text-sm">Practical Task Submission Checklist</h3>
+                <div className="grid gap-3 mt-2 sm:grid-cols-3">
+                  <div><p className="font-semibold">Task 1</p><p>✓ API call completed</p><p>✓ magic_code obtained</p><p>✓ Correct colour selected</p></div>
+                  <div><p className="font-semibold">Task 2</p><p>✓ Actor built, deployed, and run</p><p>✓ Required counts obtained</p><p>✓ Submission payload accepted</p></div>
+                  <div><p className="font-semibold">Task 3</p><p>✓ PRN matched to spreadsheet row</p><p>✓ Coordinates and temperature obtained</p><p>✓ Submission payload accepted</p></div>
+                </div>
+                <p className="mt-2 text-green-800">For Tasks 2 and 3, “accepted” means your payload was recorded. The verification status may remain pending while the system checks it.</p>
+              </div>
             </div>
 
             {/* Total marks */}
-            {status?.total_marks !== null && examClosed && (
+            {examClosed && !status?.final_score_ready && (
+              <div className="card text-center py-5 bg-yellow-50 border-yellow-200">
+                <p className="font-semibold text-yellow-900">Final score is being prepared</p>
+                <p className="text-xs text-yellow-800 mt-1">
+                  {status?.verification_pending ?? 0} submission(s) still need verification. Your final score will appear after all checks complete.
+                </p>
+              </div>
+            )}
+            {status?.total_marks !== null && status?.final_score_ready && examClosed && (
               <div className="card text-center py-6 bg-gradient-to-br from-blue-50 to-indigo-50 border-blue-200">
                 <p className="text-sm text-blue-600 font-semibold uppercase tracking-wide">Final Score</p>
                 <p className="text-6xl font-bold text-blue-900 mt-2 tabular-nums">{status?.total_marks?.toFixed(1)}</p>

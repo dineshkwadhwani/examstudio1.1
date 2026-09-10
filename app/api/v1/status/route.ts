@@ -72,7 +72,12 @@ export async function GET(req: NextRequest) {
     }
   }
 
-  const totalMarks = effectiveStatus === 'closed' || effectiveStatus === 'archived'
+  const verificationPending = (submissions ?? []).filter(sub =>
+    sub.task_no === 2 || sub.task_no === 3
+  ).filter(sub => sub.verification_status === 'pending' || sub.verification_status === 'deferred').length
+  const finalScoreReady = (effectiveStatus === 'closed' || effectiveStatus === 'archived') && verificationPending === 0
+
+  const totalMarks = finalScoreReady
     ? (mcqMarks ?? 0) +
       (taskMap[1].marks ?? 0) +
       (taskMap[2].marks ?? 0) +
@@ -93,6 +98,8 @@ export async function GET(req: NextRequest) {
     },
     tasks: taskMap,
     total_marks: totalMarks,
+    final_score_ready: finalScoreReady,
+    verification_pending: verificationPending,
     exam_ends_at: session?.ends_at ?? null,
   })
 }

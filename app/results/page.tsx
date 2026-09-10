@@ -15,6 +15,8 @@ interface Status {
     attempts: number
   }>
   total_marks: number | null
+  final_score_ready: boolean
+  verification_pending: number
   exam_ends_at: string | null
 }
 
@@ -89,8 +91,7 @@ export default function ResultsPage() {
   const t3 = status?.tasks[3]
   const total = status?.total_marks
 
-  const pendingVerification =
-    [t1, t2, t3].some(t => t?.status === 'pending' || t?.status === 'deferred')
+  const pendingVerification = !status?.final_score_ready
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -110,14 +111,14 @@ export default function ResultsPage() {
         {pendingVerification && (
           <div className="card bg-yellow-50 border-yellow-200">
             <p className="text-yellow-800 text-sm font-medium">
-              ⏳ Verification still in progress for one or more tasks.
-              Marks will update automatically — refresh this page in a minute.
+              ⏳ {status?.verification_pending ?? 0} submission(s) still need verification.
+              Your final score will appear when all verification is complete. Refresh this page in a minute.
             </p>
           </div>
         )}
 
         {/* Total */}
-        {total !== null && (
+        {total !== null && status?.final_score_ready && (
           <div className="card text-center py-8 bg-gradient-to-br from-blue-50 to-indigo-50 border-blue-200">
             <p className="text-sm text-blue-600 font-semibold uppercase tracking-wide">Total Score</p>
             <p className="text-7xl font-bold text-blue-900 mt-3 tabular-nums">{total.toFixed(1)}</p>

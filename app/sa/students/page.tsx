@@ -38,6 +38,11 @@ export default function SAStudentsPage() {
   const [students, setStudents] = useState<Student[]>([])
   const [loading, setLoading] = useState(true)
   const [search, setSearch] = useState('')
+  const [showAddStudent, setShowAddStudent] = useState(false)
+  const [newStudent, setNewStudent] = useState({ prn: '', name: '' })
+  const [addingStudent, setAddingStudent] = useState(false)
+  const [addMessage, setAddMessage] = useState('')
+  const [addError, setAddError] = useState('')
 
   useEffect(() => {
     fetchStudents()
@@ -55,6 +60,23 @@ export default function SAStudentsPage() {
     fetchStudents(e.target.value)
   }
 
+  async function addRosterStudent() {
+    setAddingStudent(true)
+    setAddMessage('')
+    setAddError('')
+    const res = await fetch('/api/sa/roster', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(newStudent),
+    })
+    const data = await res.json()
+    setAddingStudent(false)
+    if (!res.ok) { setAddError(data.message ?? 'Could not add student.'); return }
+    setAddMessage(data.message)
+    setNewStudent({ prn: '', name: '' })
+    fetchStudents(search)
+  }
+
   if (loading) return (
     <div className="min-h-screen flex items-center justify-center bg-gray-900">
       <div className="text-gray-400">Loading…</div>
@@ -67,6 +89,9 @@ export default function SAStudentsPage() {
         <div className="max-w-7xl mx-auto px-4 py-3 flex items-center justify-between">
           <h1 className="font-bold">Students ({students.length})</h1>
           <div className="flex items-center gap-3">
+            <button onClick={() => setShowAddStudent(value => !value)} className="btn-primary text-xs">
+              + Add student
+            </button>
             <input
               className="input bg-gray-700 border-gray-600 text-white text-sm w-64"
               placeholder="Search name, email, PRN…"
@@ -79,6 +104,25 @@ export default function SAStudentsPage() {
       </header>
 
       <main className="max-w-7xl mx-auto px-4 py-6">
+        {showAddStudent && (
+          <section className="bg-gray-800 border border-gray-700 rounded-xl p-4 mb-5 max-w-xl">
+            <h2 className="font-semibold text-sm">Add eligible student</h2>
+            <p className="text-xs text-gray-400 mt-1">Use this when a student is missing from the roster. They can immediately complete the normal registration form using this PRN.</p>
+            <div className="grid grid-cols-2 gap-3 mt-3">
+              <input className="input bg-gray-700 border-gray-600 text-white text-sm" placeholder="PRN"
+                value={newStudent.prn} onChange={e => setNewStudent(value => ({ ...value, prn: e.target.value }))} />
+              <input className="input bg-gray-700 border-gray-600 text-white text-sm" placeholder="Student name"
+                value={newStudent.name} onChange={e => setNewStudent(value => ({ ...value, name: e.target.value }))} />
+            </div>
+            <div className="flex items-center gap-3 mt-3">
+              <button onClick={addRosterStudent} disabled={addingStudent} className="btn-primary text-sm">
+                {addingStudent ? 'Adding…' : 'Add to roster'}
+              </button>
+              {addMessage && <p className="text-xs text-green-400">{addMessage}</p>}
+              {addError && <p className="text-xs text-red-400">{addError}</p>}
+            </div>
+          </section>
+        )}
         <div className="overflow-x-auto">
           <table className="w-full text-sm">
             <thead>
