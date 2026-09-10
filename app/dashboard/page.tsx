@@ -94,6 +94,7 @@ export default function DashboardPage() {
   const [confirmSubmit, setConfirmSubmit] = useState(false)
   const [finishingTest, setFinishingTest] = useState(false)
   const [finishError, setFinishError] = useState('')
+  const [examCount, setExamCount] = useState<number | null>(null)
 
   const fetchStatus = useCallback(async () => {
     const statusRes = await fetch('/api/me/status')
@@ -114,17 +115,26 @@ export default function DashboardPage() {
     if (keyRes.ok) setKeyInfo(await keyRes.json())
   }, [])
 
+  const fetchExamCount = useCallback(async () => {
+    const examsRes = await fetch('/api/me/exams')
+    if (examsRes.ok) {
+      const data = await examsRes.json() as { count: number }
+      setExamCount(data.count)
+    }
+  }, [])
+
   useEffect(() => {
     const initialFetch = setTimeout(() => {
       fetchStatus()
       fetchKeyInfo()
+      fetchExamCount()
     }, 0)
     const id = setInterval(fetchStatus, 8_000)
     return () => {
       clearTimeout(initialFetch)
       clearInterval(id)
     }
-  }, [fetchStatus, fetchKeyInfo])
+  }, [fetchStatus, fetchKeyInfo, fetchExamCount])
 
   async function generateKey(replace = false) {
     setGeneratingKey(true)
@@ -238,17 +248,44 @@ export default function DashboardPage() {
             <AccountMenu />
           </div>
         </header>
-        <main className="max-w-xl mx-auto px-4 py-12">
-          <div className="card text-center space-y-3">
-            <h2 className="font-semibold text-gray-900">
-              {registrationOpen ? 'Exam scheduled to start' : 'No exam registration has started yet'}
-            </h2>
-            <p className="text-sm text-gray-600">
-              {registrationOpen
-                ? 'Registration is open. Your exam will appear here when the invigilator starts it.'
-                : 'Please check back when the invigilator opens registration.'}
-            </p>
-            <Link href="/my-exams" className="btn-secondary inline-flex text-sm">View My Exams</Link>
+        <main className="max-w-4xl mx-auto px-4 py-10">
+          <div className="grid gap-4 md:grid-cols-2">
+            <section className="card">
+              <h2 className="font-semibold text-gray-900">Your Exam API Key</h2>
+              <p className="mt-1 text-sm text-gray-600">Use this key when an exam asks you to call the Exam API.</p>
+              {!hasKey ? (
+                <button onClick={() => generateKey()} disabled={generatingKey} className="btn-primary mt-4 text-sm">
+                  {generatingKey ? 'Generating…' : 'Generate API Key'}
+                </button>
+              ) : newKey ? (
+                <div className="mt-4 space-y-3">
+                  <code className="block break-all rounded-lg bg-gray-900 p-3 text-sm text-green-400">{newKey}</code>
+                  <button onClick={copyKey} className="btn-secondary text-sm">{copied ? 'Copied!' : 'Copy key'}</button>
+                </div>
+              ) : (
+                <div className="mt-4 flex flex-wrap items-center gap-2">
+                  <code className="rounded bg-gray-100 px-3 py-1.5 text-sm">{keyInfo?.key_prefix}…</code>
+                  <button onClick={viewKey} disabled={viewingKey} className="btn-secondary text-sm">{viewingKey ? 'Loading…' : 'View key'}</button>
+                </div>
+              )}
+              {keyError && <p className="mt-2 text-xs text-red-600" role="alert">{keyError}</p>}
+              {replacementRequired && <button onClick={() => generateKey(true)} disabled={generatingKey} className="btn-secondary mt-2 text-xs">Generate replacement key</button>}
+            </section>
+
+            <section className="card">
+              <h2 className="font-semibold text-gray-900">My Exams</h2>
+              <p className="mt-1 text-sm text-gray-600">Review completed answer sheets and marks.</p>
+              <p className="mt-4 text-3xl font-bold text-blue-900">{examCount ?? '—'} <span className="text-sm font-normal text-gray-500">exam{examCount === 1 ? '' : 's'} taken</span></p>
+              <Link href="/my-exams" className="btn-secondary mt-4 inline-flex text-sm">View My Exams</Link>
+            </section>
+
+            {registrationOpen && (
+              <section className="card border-blue-200 bg-blue-50 md:col-span-2">
+                <h2 className="font-semibold text-blue-950">Exam scheduled to start</h2>
+                <p className="mt-1 text-sm text-blue-800">Registration is open. Your exam will appear here when the invigilator starts it.</p>
+              </section>
+            )}
+            {!registrationOpen && <p className="md:col-span-2 text-center text-sm text-gray-600">No exam registration has started yet. Please check back when the invigilator opens registration.</p>}
           </div>
         </main>
       </div>
