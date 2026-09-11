@@ -301,7 +301,7 @@ export default function DashboardPage() {
       <header className="bg-white border-b border-gray-200 sticky top-0 z-10">
         <div className="max-w-4xl mx-auto px-4 py-3 flex flex-wrap gap-3 items-center justify-between">
           <div>
-            <h1 className="font-bold text-gray-900 text-base">F0003 CA1 — Practical Exam</h1>
+            <h1 className="font-bold text-gray-900 text-base">F0003 CA2 — Practical Exam</h1>
             <p className="text-xs text-gray-500">Autonomous AI Systems · 15 marks · 50 minutes</p>
           </div>
           <div className="ml-auto flex flex-wrap items-center justify-end gap-3">

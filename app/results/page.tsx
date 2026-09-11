@@ -93,7 +93,7 @@ export default function ResultsPage() {
       <header className="bg-white border-b border-gray-200">
         <div className="max-w-2xl mx-auto px-4 py-4 flex flex-wrap gap-3 items-center justify-between">
           <div>
-            <h1 className="font-bold text-gray-900">F0003 CA1 — Results</h1>
+            <h1 className="font-bold text-gray-900">F0003 CA2 — Results</h1>
             <p className="text-xs text-gray-500">Autonomous AI Systems and Agent-Based Computing</p>
           </div>
           <AccountMenu />

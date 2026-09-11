@@ -33,7 +33,7 @@ export default function SALoginPage() {
         <div className="text-center mb-8">
           <div className="text-4xl mb-3">🔐</div>
           <h1 className="text-2xl font-bold text-white">Staff Login</h1>
-          <p className="text-gray-400 mt-1 text-sm">Exam Studio — F0003 CA1</p>
+          <p className="text-gray-400 mt-1 text-sm">Exam Studio — F0003 CA2</p>
         </div>
         <form onSubmit={handleSubmit} className="bg-gray-900 border border-gray-700 rounded-xl p-6 space-y-4">
           <Alert type="error" message={error} />

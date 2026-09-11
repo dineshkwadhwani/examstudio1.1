@@ -44,7 +44,7 @@ export default function RegisterPage() {
         <div className="text-center mb-8">
           <div className="text-4xl mb-3">📝</div>
           <h1 className="text-2xl font-bold text-gray-900">Student Registration</h1>
-          <p className="text-gray-600 mt-1 text-sm">F0003 CA1 Practical Examination</p>
+          <p className="text-gray-600 mt-1 text-sm">F0003 CA2 Practical Examination</p>
         </div>
 
         <form onSubmit={handleSubmit} className="card space-y-4">
