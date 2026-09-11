@@ -548,18 +548,17 @@ export default function DashboardPage() {
                   <div><p className="font-semibold text-gray-900 mb-1">Workflow</p><Flow steps={['Exam API Key', 'GET /api/v1/paper', 'magic_code', 'Select colour']} /></div>
                 </div>
 
-                <p className="text-xs font-semibold text-gray-800 mb-2">What you submit: Select the colour named in the <code className="font-mono">magic_code</code> returned by the API.</p>
+                <p className="text-xs font-semibold text-gray-800 mb-2">What you submit: Select the colour named in the <code className="font-mono">magic_code</code> returned by the API. You can change your selection while the exam is running.</p>
 
                 <div className="grid grid-cols-4 gap-2">
                   {COLOURS.map(colour => {
                     const isSelected = (task1?.submitted_colour ?? selectedColour) === colour
-                    const alreadySubmitted = task1?.submitted || colourSubmitted
                     return (
                       <button
                         key={colour}
                         aria-pressed={isSelected}
-                        onClick={() => !alreadySubmitted && submitColour(colour)}
-                        disabled={submittingColour || !!alreadySubmitted || !examRunning}
+                        onClick={() => submitColour(colour)}
+                        disabled={submittingColour || !examRunning}
                         className={`px-3 py-3 rounded-xl border-2 font-semibold text-sm transition-all ${
                           isSelected
                             ? `${COLOUR_SELECTED[colour]} ring-2 ring-offset-2 ring-gray-700`
