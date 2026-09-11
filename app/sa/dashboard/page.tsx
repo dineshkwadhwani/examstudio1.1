@@ -29,6 +29,7 @@ interface Session {
   results_released_at: string | null
   relax_apify_verification: boolean
   sheet_csv_url: string
+  sheet_snapshot: Record<string, unknown>
   verification: { total: number; pending: number; complete: boolean }
 }
 
@@ -419,6 +420,9 @@ export default function SADashboard() {
                         Ends: {new Date(s.ends_at).toLocaleTimeString()}
                       </p>
                     )}
+                    <p className="text-xs text-gray-400 mt-0.5">
+                      CSV snapshot: {Object.keys(s.sheet_snapshot ?? {}).length} students
+                    </p>
                   </div>
                   <div className="text-right">
                     <span className={`badge text-xs ${
