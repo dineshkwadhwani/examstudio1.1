@@ -271,7 +271,8 @@ export default function SADashboard() {
                 <Countdown endsAt={activeSession.ends_at} />
               </div>
             )}
-            <nav className="flex gap-2">
+          <nav className="flex gap-2">
+            <Link href="/sa/teams" className="btn-secondary text-xs">Teams</Link>
               <Link href="/sa/students" className="btn-secondary text-xs">Students</Link>
               <Link href="/sa/flags" className="btn-secondary text-xs">
                 Flags {stats?.flags_open ? `(${stats.flags_open})` : ''}

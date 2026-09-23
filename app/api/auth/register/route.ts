@@ -94,6 +94,14 @@ export async function POST(req: NextRequest) {
     return serverError('Could not create account. Please try again.')
   }
 
+  // A roster student may have been reserved in a team before registering.
+  // Link that reservation now so the new account can access the team.
+  await db.from('ca1_team_members')
+    .update({ student_id: newStudent.id })
+    .eq('roster_prn', newStudent.prn)
+    .is('student_id', null)
+    .is('left_at', null)
+
   await audit(`student:${prn.trim()}`, 'registered', `student:${newStudent.id}`)
 
   return ok({ message: 'Registration successful. You can now log in.' }, 201)

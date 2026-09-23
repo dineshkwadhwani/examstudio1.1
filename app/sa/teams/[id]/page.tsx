@@ -1,0 +1,17 @@
+'use client'
+
+import { useCallback, useEffect, useState } from 'react'
+import Link from 'next/link'
+import { useParams, useRouter } from 'next/navigation'
+
+type Team = { id: number; name: string; project_name: string | null; project_description: string | null; status: string; rejection_reason: string | null; members: Array<{ roster_prn: string; ca1_roster: { name: string }; ca1_students?: { email: string } | { email: string }[] | null }> }
+
+export default function SATeamDetailPage() {
+  const { id } = useParams<{ id: string }>(); const router = useRouter()
+  const [team, setTeam] = useState<Team | null>(null); const [reason, setReason] = useState(''); const [message, setMessage] = useState(''); const [error, setError] = useState('')
+  const load = useCallback(async () => { const res = await fetch(`/api/sa/teams/${id}`); if (res.status === 401 || res.status === 403) { router.push('/sa/login'); return }; if (res.ok) setTeam(await res.json()); else setError('Team not found.') }, [id, router])
+  useEffect(() => { const timer = setTimeout(load, 0); return () => clearTimeout(timer) }, [load])
+  async function review(action: 'approve' | 'reject') { setMessage(''); setError(''); const res = await fetch('/api/sa/teams', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action, team_id: Number(id), reason }) }); const data = await res.json(); if (!res.ok) { setError(data.message ?? 'Could not review team.'); return }; setMessage(data.message); load() }
+  if (!team) return <div className="min-h-screen bg-gray-900 flex items-center justify-center text-gray-400">{error || 'Loading…'}</div>
+  return <div className="min-h-screen bg-gray-900 text-white"><header className="border-b border-gray-700 bg-gray-800"><div className="mx-auto flex max-w-4xl items-center justify-between px-4 py-3"><h1 className="font-bold">{team.name}</h1><Link href="/sa/teams" className="btn-secondary text-xs">← Teams</Link></div></header><main className="mx-auto max-w-4xl space-y-5 px-4 py-6">{message && <p className="rounded-lg bg-green-900/40 p-3 text-green-300">{message}</p>}{error && <p className="rounded-lg bg-red-900/40 p-3 text-red-300">{error}</p>}<section className="rounded-xl border border-gray-700 bg-gray-800 p-5"><p className="mb-4 capitalize text-sm text-gray-400">Status: {team.status.replace('_', ' ')}</p><h2 className="font-semibold">Members</h2><ul className="mt-2 list-disc pl-5 text-gray-300">{team.members.map(member => <li key={member.roster_prn}>{member.ca1_roster.name} ({member.roster_prn})</li>)}</ul><h2 className="mt-6 font-semibold">Project name</h2><p className="mt-1 text-gray-300">{team.project_name || 'Not provided'}</p><h2 className="mt-6 font-semibold">Project description</h2><p className="mt-1 whitespace-pre-wrap text-gray-300">{team.project_description || 'Not provided'}</p></section>{team.status === 'pending_approval' && <section className="rounded-xl border border-gray-700 bg-gray-800 p-5 space-y-3"><h2 className="font-semibold">Review</h2><textarea className="input min-h-24 bg-gray-700 text-white" placeholder="Required when rejecting" value={reason} onChange={e => setReason(e.target.value)} /><div className="flex gap-3"><button className="btn-primary" onClick={() => review('approve')}>Approve team</button><button className="rounded-lg bg-red-700 px-4 py-2 text-sm font-medium text-white hover:bg-red-600" onClick={() => review('reject')}>Reject team</button></div></section>}</main></div>
+}

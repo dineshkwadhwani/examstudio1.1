@@ -72,6 +72,7 @@ export function AccountMenu() {
         <nav aria-label="Student account" onClick={() => { if (menu.current) menu.current.open = false }}>
           <Link href="/profile" className="block rounded-lg px-3 py-2 hover:bg-gray-100">My profile</Link>
           <Link href="/my-exams" className="block rounded-lg px-3 py-2 hover:bg-gray-100">My Exams</Link>
+          <Link href="/team" className="block rounded-lg px-3 py-2 hover:bg-gray-100">My Team</Link>
           <Link href="/dashboard" className="block rounded-lg px-3 py-2 hover:bg-gray-100">Dashboard</Link>
         </nav>
         <button onClick={logout} disabled={loggingOut} className="w-full rounded-lg px-3 py-2 text-left text-red-700 hover:bg-red-50 disabled:opacity-50">{loggingOut ? 'Logging out…' : 'Log out'}</button>
