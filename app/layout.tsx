@@ -2,7 +2,7 @@ import type { Metadata } from 'next'
 import './globals.css'
 
 export const metadata: Metadata = {
-  title: 'Exam Studio — F0003 CA2',
+  title: 'Exam Studio — F0003 CA2/CA3',
   description: 'CA2 Practical Examination — Autonomous AI Systems and Agent-Based Computing',
   icons: {
     icon: { url: '/favicon.jpeg', type: 'image/jpeg' },
