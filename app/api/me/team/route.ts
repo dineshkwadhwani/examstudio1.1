@@ -101,6 +101,8 @@ export async function POST(req: NextRequest) {
     if (!prn) return badRequest('Student PRN is required.')
     const { data: roster } = await db.from('ca1_roster').select('prn').eq('prn', prn).single()
     if (!roster) return badRequest('Student was not found in the roster.')
+    const { data: activeReservation } = await db.from('ca1_team_members').select('team_id').eq('roster_prn', prn).is('left_at', null).maybeSingle()
+    if (activeReservation) return conflict('already_reserved', 'This student is already reserved in another team.')
     const { data: registered } = await db.from('ca1_students').select('id').eq('prn', prn).maybeSingle()
     const { error } = await db.from('ca1_team_members').insert({ team_id: team.id, roster_prn: prn, student_id: registered?.id ?? null })
     if (error?.code === '23505') return conflict('already_reserved', 'This student is already reserved in another team.')
