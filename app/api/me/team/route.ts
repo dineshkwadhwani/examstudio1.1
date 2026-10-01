@@ -126,7 +126,7 @@ export async function POST(req: NextRequest) {
 
   if (action === 'submit') {
     if (!editable(team.status)) return conflict('team_locked', 'This team has already been submitted.')
-    if (team.members.length < 3 || team.members.length > 4) return badRequest('A team must have 3 or 4 members before submission.')
+    if (team.members.length < 1 || team.members.length > 4) return badRequest('A team must have 1 to 4 members before submission.')
     const projectName = body.project_name?.trim()
     const projectDescription = body.project_description?.trim()
     if (!projectName || !projectDescription) return badRequest('Project name and description are required for approval.')

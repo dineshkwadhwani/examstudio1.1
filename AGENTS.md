@@ -74,7 +74,7 @@ CA3 artifacts and evaluation are introduced by migrations `015` through `018`. M
 
 - Any registered student can create a team.
 - A team name is mandatory even for a saved draft and is unique case-insensitively.
-- A team can have a minimum of 3 and maximum of 4 active members for approval submission.
+- A team can have a minimum of 1 and maximum of 4 active members for approval submission.
 - A roster student can be added before registering. This reserves their PRN; they must register later to access the application/team.
 - A student/roster PRN can have only one active team reservation at a time.
 - Membership is immediate; there is no invitation/acceptance workflow.
@@ -82,7 +82,7 @@ CA3 artifacts and evaluation are introduced by migrations `015` through `018`. M
 - Draft and rejected teams can be edited by their registered members: rename, add/remove members, and provide project details.
 - A student may leave a draft/rejected team. A reservation is released by setting `left_at`; historical rows are retained.
 - A team may be saved without project name/description, but cannot be submitted without both.
-- Submission requires exactly 3 or 4 active members, a project name, and a project description.
+- Submission requires 1 to 4 active members, a project name, and a project description.
 - Submission changes status to `pending_approval`.
 - Super Admin approval changes status to `approved`.
 - Super Admin rejection requires a reason and changes status to `rejected`; students can edit and resubmit.
