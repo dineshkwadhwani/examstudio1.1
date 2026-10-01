@@ -209,7 +209,7 @@ export default function SAStudentsPage() {
             </thead>
             <tbody className="divide-y divide-gray-800">
               {students.map(s => (
-                <tr key={s.id} className="hover:bg-gray-800 transition-colors">
+                <tr key={`${s.id}-${s.session_id ?? 'none'}`} className="hover:bg-gray-800 transition-colors">
                   <td className="py-2.5 pr-3">
                     <input
                       type="checkbox"

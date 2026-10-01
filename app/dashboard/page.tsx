@@ -43,6 +43,13 @@ interface Paper {
   }
 }
 
+interface ApprovedProject {
+  id: number
+  name: string
+  status: string
+  project_name: string | null
+}
+
 const COLOURS = ['Red', 'Blue', 'Green', 'Orange']
 const COLOUR_STYLES: Record<string, string> = {
   Red:    'bg-red-100 border-red-400 text-red-800 hover:bg-red-200',
@@ -96,6 +103,7 @@ export default function DashboardPage() {
   const [finishingTest, setFinishingTest] = useState(false)
   const [finishError, setFinishError] = useState('')
   const [examCount, setExamCount] = useState<number | null>(null)
+  const [approvedProject, setApprovedProject] = useState<ApprovedProject | null>(null)
 
   const fetchStatus = useCallback(async () => {
     const statusRes = await fetch('/api/me/status')
@@ -124,18 +132,27 @@ export default function DashboardPage() {
     }
   }, [])
 
+  const fetchApprovedProject = useCallback(async () => {
+    const teamRes = await fetch('/api/me/team')
+    if (teamRes.ok) {
+      const data = await teamRes.json()
+      setApprovedProject(data.team?.status === 'approved' ? data.team : null)
+    }
+  }, [])
+
   useEffect(() => {
     const initialFetch = setTimeout(() => {
       fetchStatus()
       fetchKeyInfo()
       fetchExamCount()
+      fetchApprovedProject()
     }, 0)
     const id = setInterval(fetchStatus, 8_000)
     return () => {
       clearTimeout(initialFetch)
       clearInterval(id)
     }
-  }, [fetchStatus, fetchKeyInfo, fetchExamCount])
+  }, [fetchStatus, fetchKeyInfo, fetchExamCount, fetchApprovedProject])
 
   async function generateKey(replace = false) {
     setGeneratingKey(true)
@@ -281,6 +298,15 @@ export default function DashboardPage() {
               <Link href="/my-exams" className="btn-secondary mt-4 inline-flex text-sm">View My Exams</Link>
             </section>
 
+            {approvedProject && (
+              <Link href="/project" className="card block border-green-200 bg-green-50 transition hover:border-green-400 hover:shadow-md">
+                <p className="text-xs font-semibold uppercase tracking-wide text-green-700">Approved project</p>
+                <h2 className="mt-1 font-semibold text-green-950">{approvedProject.project_name || approvedProject.name}</h2>
+                <p className="mt-1 text-sm text-green-800">View your team project and submission options.</p>
+                <span className="btn-primary mt-4 inline-flex text-sm">Open project</span>
+              </Link>
+            )}
+
             {registrationOpen && (
               <section className="card border-blue-200 bg-blue-50 md:col-span-2">
                 <h2 className="font-semibold text-blue-950">Exam scheduled to start</h2>
@@ -395,6 +421,15 @@ export default function DashboardPage() {
             <h2 className="font-semibold text-blue-900">Test submitted</h2>
             <p className="text-sm text-blue-800 mt-2">Your test has ended and your answers are locked. Results will be available after the exam session closes.</p>
           </div>
+        )}
+
+        {approvedProject && (
+          <Link href="/project" className="card block border-green-200 bg-green-50 transition hover:border-green-400 hover:shadow-md">
+            <p className="text-xs font-semibold uppercase tracking-wide text-green-700">Approved project</p>
+            <h2 className="mt-1 font-semibold text-green-950">{approvedProject.project_name || approvedProject.name}</h2>
+            <p className="mt-1 text-sm text-green-800">View your team project and submission options.</p>
+            <span className="btn-primary mt-4 inline-flex text-sm">Open project</span>
+          </Link>
         )}
 
         {examRunning && paperFetched && (

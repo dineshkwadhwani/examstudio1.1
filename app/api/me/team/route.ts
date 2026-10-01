@@ -16,7 +16,9 @@ async function getTeam(studentId: number) {
   const { data: membership } = await db.from('ca1_team_members')
     .select('team_id').eq('student_id', studentId).is('left_at', null).maybeSingle()
   if (!membership) return null
-  const { data: team, error } = await db.from('ca1_teams').select('*').eq('id', membership.team_id).single()
+  const { data: team, error } = await db.from('ca1_teams')
+    .select('id, name, project_name, project_description, review_comments, created_by, status, rejection_reason, submitted_at, reviewed_at, reviewed_by, created_at, updated_at')
+    .eq('id', membership.team_id).single()
   if (error || !team) return null
   const { data: members } = await db.from('ca1_team_members')
     .select('id, roster_prn, student_id, joined_at, ca1_roster!inner(prn, name), ca1_students(email)')

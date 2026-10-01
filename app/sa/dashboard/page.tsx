@@ -273,6 +273,7 @@ export default function SADashboard() {
             )}
           <nav className="flex gap-2">
             <Link href="/sa/teams" className="btn-secondary text-xs">Teams</Link>
+            <Link href="/sa/projects" className="btn-secondary text-xs">CA3 Projects</Link>
               <Link href="/sa/students" className="btn-secondary text-xs">Students</Link>
               <Link href="/sa/flags" className="btn-secondary text-xs">
                 Flags {stats?.flags_open ? `(${stats.flags_open})` : ''}

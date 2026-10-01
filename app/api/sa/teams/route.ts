@@ -11,7 +11,7 @@ export async function GET(req: NextRequest) {
   try { await requireSA() } catch { return forbidden('Super Admin access required.') }
   if (new URL(req.url).searchParams.get('format') === 'csv') {
     const { data: teams, error: teamsError } = await db.from('ca1_teams')
-      .select('id, name, project_name, project_description, status, rejection_reason, created_at, submitted_at')
+      .select('id, name, project_name, project_description, project_strength, review_comments, status, rejection_reason, created_at, submitted_at')
       .order('created_at', { ascending: false })
     if (teamsError) return serverError('Could not export teams.')
     const { data: members, error: membersError } = await db.from('ca1_team_members')
@@ -26,15 +26,15 @@ export async function GET(req: NextRequest) {
       current.push({ roster_prn: member.roster_prn, ca1_roster: { name: roster?.name ?? '' } })
       membersByTeam.set(member.team_id, current)
     }
-    const header = ['Team ID', 'Team Name', 'Status', 'Project Name', 'Project Description', 'Rejection Reason', 'Member 1 Name', 'Member 1 PRN', 'Member 2 Name', 'Member 2 PRN', 'Member 3 Name', 'Member 3 PRN', 'Member 4 Name', 'Member 4 PRN']
+    const header = ['Team ID', 'Team Name', 'Status', 'Project Name', 'Project Description', 'Project Strength', 'Review Comments', 'Rejection Reason', 'Member 1 Name', 'Member 1 PRN', 'Member 2 Name', 'Member 2 PRN', 'Member 3 Name', 'Member 3 PRN', 'Member 4 Name', 'Member 4 PRN']
     const rows = (teams ?? []).map(team => {
       const teamMembers = membersByTeam.get(team.id) ?? []
-      return [team.id, team.name, team.status, team.project_name, team.project_description, team.rejection_reason, ...Array.from({ length: 4 }, (_, index) => [teamMembers[index]?.ca1_roster.name ?? '', teamMembers[index]?.roster_prn ?? '']).flat()]
+      return [team.id, team.name, team.status, team.project_name, team.project_description, team.project_strength, team.review_comments, team.rejection_reason, ...Array.from({ length: 4 }, (_, index) => [teamMembers[index]?.ca1_roster.name ?? '', teamMembers[index]?.roster_prn ?? '']).flat()]
     })
     const csv = [header, ...rows].map(row => row.map(csvCell).join(',')).join('\r\n') + '\r\n'
     return new Response(csv, { headers: { 'Content-Type': 'text/csv; charset=utf-8', 'Content-Disposition': `attachment; filename="exam-studio-teams-${new Date().toISOString().slice(0, 10)}.csv"` } })
   }
-  const { data: teams, error } = await db.from('ca1_teams').select('id, name, project_name, status, rejection_reason, submitted_at, created_at, ca1_team_members!inner(roster_prn, ca1_roster!inner(name))').is('ca1_team_members.left_at', null).order('created_at', { ascending: false })
+  const { data: teams, error } = await db.from('ca1_teams').select('id, name, project_name, project_strength, status, rejection_reason, submitted_at, created_at, ca1_team_members!inner(roster_prn, ca1_roster!inner(name))').is('ca1_team_members.left_at', null).order('created_at', { ascending: false })
   if (error) return serverError('Could not load teams.')
   return ok(teams ?? [])
 }
