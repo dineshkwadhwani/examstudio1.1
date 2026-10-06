@@ -19,6 +19,16 @@ interface Stats {
   ends_at: string | null
 }
 
+interface Ca3Stats {
+  total_teams: number
+  approved_teams: number
+  pending_approval: number
+  rejected_teams: number
+  submitted_artifacts: number
+  locked_artifacts: number
+  results_published: boolean
+}
+
 interface Session {
   id: number
   label: string
@@ -36,6 +46,7 @@ interface Session {
 export default function SADashboard() {
   const router = useRouter()
   const [stats, setStats] = useState<Stats | null>(null)
+  const [ca3Stats, setCa3Stats] = useState<Ca3Stats | null>(null)
   const [sessions, setSessions] = useState<Session[]>([])
   const [loading, setLoading] = useState(true)
   const [msg, setMsg] = useState('')
@@ -47,21 +58,23 @@ export default function SADashboard() {
   const [verifyResult, setVerifyResult] = useState<{ pending_before: number; pending_after: number; processed: number } | null>(null)
 
   const fetchAll = useCallback(async () => {
-    const [statsRes, sessionsRes] = await Promise.all([
+    const [statsRes, sessionsRes, ca3Res] = await Promise.all([
       fetch('/api/sa/session/stats'),
       fetch('/api/sa/session'),
+      fetch('/api/sa/ca3-stats'),
     ])
     if (statsRes.status === 401 || statsRes.status === 403) {
       router.push('/sa/login')
       return
     }
-    if (!statsRes.ok || !sessionsRes.ok) {
-      setError('Could not refresh session verification status. Please try again.')
+    if (!statsRes.ok || !sessionsRes.ok || !ca3Res.ok) {
+      setError('Could not refresh dashboard data. Please try again.')
       setLoading(false)
       return
     }
     setStats(await statsRes.json())
     setSessions(await sessionsRes.json())
+    setCa3Stats(await ca3Res.json())
     setLoading(false)
   }, [router])
 
@@ -271,10 +284,10 @@ export default function SADashboard() {
                 <Countdown endsAt={activeSession.ends_at} />
               </div>
             )}
-          <nav className="flex gap-2">
-            <Link href="/sa/teams" className="btn-secondary text-xs">Teams</Link>
-            <Link href="/sa/projects" className="btn-secondary text-xs">CA3 Projects</Link>
-              <Link href="/sa/students" className="btn-secondary text-xs">Students</Link>
+            <nav className="flex gap-2">
+            <Link href="/sa/teams" className="btn-secondary text-xs">CA3</Link>
+              <Link href="/sa/students" className="btn-secondary text-xs">CA2</Link>
+              <Link href="/sa/student-overview" className="btn-secondary text-xs">Students</Link>
               <Link href="/sa/flags" className="btn-secondary text-xs">
                 Flags {stats?.flags_open ? `(${stats.flags_open})` : ''}
               </Link>
@@ -288,9 +301,9 @@ export default function SADashboard() {
         {msg && <Alert type="success" message={msg} />}
         {error && <Alert type="error" message={error} />}
 
-        {/* Live stats */}
+        {/* CA2 dashboard */}
         <section>
-          <h2 className="text-sm font-semibold text-gray-400 uppercase tracking-wide mb-3">Live Board</h2>
+          <h2 className="text-sm font-semibold text-gray-400 uppercase tracking-wide mb-3">CA2 Dashboard</h2>
           <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
             <div className="bg-gray-800 border border-gray-700 rounded-xl p-4 text-center">
               <p className="text-3xl font-bold text-blue-400">{stats?.registered ?? 0}</p>
@@ -362,6 +375,38 @@ export default function SADashboard() {
               </div>
             </div>
           )}
+        </section>
+
+        {/* CA3 dashboard */}
+        <section>
+          <div className="flex items-center justify-between mb-3">
+            <h2 className="text-sm font-semibold text-gray-400 uppercase tracking-wide">CA3 Dashboard</h2>
+            <Link href="/sa/teams" className="text-xs text-blue-400 hover:text-blue-300">Open CA3 →</Link>
+          </div>
+          <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
+            {[
+              { label: 'Total teams', value: ca3Stats?.total_teams ?? 0, color: 'text-blue-400' },
+              { label: 'Approved teams', value: ca3Stats?.approved_teams ?? 0, color: 'text-green-400' },
+              { label: 'Pending approval', value: ca3Stats?.pending_approval ?? 0, color: 'text-yellow-400' },
+              { label: 'Submitted artifacts', value: ca3Stats?.submitted_artifacts ?? 0, color: 'text-purple-400' },
+              { label: 'Locked artifacts', value: ca3Stats?.locked_artifacts ?? 0, color: 'text-orange-400' },
+              { label: 'Rejected teams', value: ca3Stats?.rejected_teams ?? 0, color: 'text-red-400' },
+            ].map(tile => (
+              <div key={tile.label} className="bg-gray-800 border border-gray-700 rounded-xl p-4 text-center">
+                <p className={`text-3xl font-bold ${tile.color}`}>{tile.value}</p>
+                <p className="text-sm text-gray-300 mt-1">{tile.label}</p>
+              </div>
+            ))}
+          </div>
+          <div className="mt-3 bg-gray-800 border border-gray-700 rounded-xl p-4 flex items-center justify-between">
+            <div>
+              <p className="text-sm font-semibold text-gray-200">CA3 results</p>
+              <p className="text-xs text-gray-400 mt-1">Student visibility status</p>
+            </div>
+            <span className={`badge text-xs ${ca3Stats?.results_published ? 'bg-green-900 text-green-300' : 'bg-gray-700 text-gray-400'}`}>
+              {ca3Stats?.results_published ? 'Published' : 'Not published'}
+            </span>
+          </div>
         </section>
 
         {/* Session management */}
