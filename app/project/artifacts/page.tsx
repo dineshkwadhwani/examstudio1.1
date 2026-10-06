@@ -3,7 +3,7 @@ import { redirect } from 'next/navigation';
 import ArtifactsForm from '@/components/student/ArtifactsForm';
 import { PageHeader } from '@/components/student/PageHeader';
 import { getSession } from '@/lib/session';
-import { getApprovedStudentTeam } from '@/lib/artifacts';
+import { getApprovedStudentTeam, getPresentationDateOptions } from '@/lib/artifacts';
 
 export default async function ProjectArtifactsPage() {
   const session = await getSession();
@@ -11,6 +11,7 @@ export default async function ProjectArtifactsPage() {
 
   const team = await getApprovedStudentTeam(session.id);
   if (!team) redirect('/dashboard');
+  const presentationDateOptions = await getPresentationDateOptions();
 
   return (
     <>
@@ -33,6 +34,8 @@ export default async function ProjectArtifactsPage() {
             name: member.name,
             github_username: member.github_username ?? '',
           }))}
+          initialPresentationDate={team.artifacts?.presentation_date ?? null}
+          presentationDateOptions={presentationDateOptions}
         />
       </main>
     </>

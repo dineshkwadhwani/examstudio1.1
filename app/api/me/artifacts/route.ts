@@ -1,7 +1,7 @@
 import { NextRequest } from 'next/server'
 import { badRequest, conflict, err, forbidden, ok, serverError } from '@/lib/api'
 import { getSession } from '@/lib/session'
-import { getApprovedStudentTeam, upsertTeamArtifacts } from '@/lib/artifacts'
+import { getApprovedStudentTeam, getPresentationDateOptions, upsertTeamArtifacts } from '@/lib/artifacts'
 
 async function context() {
   const session = await getSession()
@@ -13,7 +13,7 @@ async function context() {
 export async function GET() {
   const ctx = await context()
   if (!ctx) return err('not_found', 'Artifacts are available only for approved projects.', 404)
-  return ok({ team: ctx.team.team, artifacts: ctx.team.artifacts, members: ctx.team.members })
+  return ok({ team: ctx.team.team, artifacts: ctx.team.artifacts, members: ctx.team.members, presentation_date_options: await getPresentationDateOptions() })
 }
 
 export async function POST(req: NextRequest) {

@@ -5,8 +5,41 @@ export const ARTIFACT_FIELDS = [
   'github_repo_url', 'project_url', 'execution_trace', 'demo_video_url',
 ] as const
 
+export const PRESENTATION_DATES = [
+  '2026-10-09',
+  '2026-10-15',
+  '2026-10-16',
+] as const
+
+export const PRESENTATION_DATE_CAPACITY = 25
+
+export type PresentationDate = typeof PRESENTATION_DATES[number]
+
+export type PresentationDateOption = {
+  date: PresentationDate
+  booked_slots: number
+  available_slots: number
+}
+
 export type ArtifactInput = Partial<Record<typeof ARTIFACT_FIELDS[number], string>> & {
   members?: Array<{ prn: string; github_username: string }>
+}
+
+export function isPresentationDate(value: unknown): value is PresentationDate {
+  return typeof value === 'string' && (PRESENTATION_DATES as readonly string[]).includes(value)
+}
+
+export async function getPresentationDateOptions(): Promise<PresentationDateOption[]> {
+  const options = await Promise.all(PRESENTATION_DATES.map(async (date) => {
+    const { count, error } = await db
+      .from('ca1_project_artifacts')
+      .select('team_id', { count: 'exact', head: true })
+      .eq('presentation_date', date)
+    if (error) throw error
+    const booked = count ?? 0
+    return { date, booked_slots: booked, available_slots: Math.max(0, PRESENTATION_DATE_CAPACITY - booked) }
+  }))
+  return options
 }
 
 export function artifactValidationErrors(data: ArtifactInput) {
@@ -41,6 +74,17 @@ export async function getApprovedStudentTeam(studentId: number) {
       github_username: member.github_username,
     })),
   }
+}
+
+export async function savePresentationDate(teamId: number, presentationDate: PresentationDate, actor: string) {
+  const { data: team } = await db.from('ca1_teams').select('id, status').eq('id', teamId).eq('status', 'approved').maybeSingle()
+  if (!team) throw new Error('PROJECT_NOT_APPROVED')
+
+  const { error } = await db
+    .from('ca1_project_artifacts')
+    .upsert({ team_id: teamId, presentation_date: presentationDate, updated_at: new Date().toISOString() }, { onConflict: 'team_id' })
+  if (error) throw error
+  await audit(actor, 'ca3_presentation_date_saved', `team:${teamId}`, { presentation_date: presentationDate })
 }
 
 async function ensureEditable(teamId: number) {
