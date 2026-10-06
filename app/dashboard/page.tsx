@@ -298,6 +298,12 @@ export default function DashboardPage() {
               <Link href="/my-exams" className="btn-secondary mt-4 inline-flex text-sm">View My Exams</Link>
             </section>
 
+            <section className="card">
+              <h2 className="font-semibold text-gray-900">CA1 Assessments</h2>
+              <p className="mt-1 text-sm text-gray-600">View assigned and completed assessments.</p>
+              <Link href="/assessments" className="btn-secondary mt-4 inline-flex text-sm">View Assessments</Link>
+            </section>
+
             {approvedProject && (
               <Link href="/project" className="card block border-green-200 bg-green-50 transition hover:border-green-400 hover:shadow-md">
                 <p className="text-xs font-semibold uppercase tracking-wide text-green-700">Approved project</p>
@@ -415,6 +421,11 @@ export default function DashboardPage() {
       )}
 
       <main className="max-w-4xl mx-auto px-4 py-5 space-y-4">
+
+        <Link href="/assessments" className="card block border-indigo-200 bg-indigo-50 transition hover:border-indigo-400 hover:shadow-md">
+          <p className="text-xs font-semibold uppercase tracking-wide text-indigo-700">CA1 Assessments</p>
+          <p className="mt-1 text-sm text-indigo-900">Open your assigned CA1 assessments and completed results.</p>
+        </Link>
 
         {testSubmitted && (
           <div className="card bg-blue-50 border-blue-200 text-center" role="status">

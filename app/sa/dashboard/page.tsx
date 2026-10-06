@@ -274,7 +274,7 @@ export default function SADashboard() {
       <header className="bg-gray-800 border-b border-gray-700 sticky top-0 z-10">
         <div className="max-w-6xl mx-auto px-4 py-3 flex items-center justify-between">
           <div>
-            <h1 className="font-bold text-white">SA Dashboard — F0003 CA2/CA3</h1>
+            <h1 className="font-bold text-white">SA Dashboard — F0003 CA1/CA2/CA3</h1>
             <p className="text-xs text-gray-400">Exam Studio</p>
           </div>
           <div className="flex items-center gap-4">
@@ -287,7 +287,8 @@ export default function SADashboard() {
             <nav className="flex gap-2">
             <Link href="/sa/teams" className="btn-secondary text-xs">CA3</Link>
               <Link href="/sa/students" className="btn-secondary text-xs">CA2</Link>
-              <Link href="/sa/student-overview" className="btn-secondary text-xs">Students</Link>
+            <Link href="/sa/student-overview" className="btn-secondary text-xs">Students</Link>
+              <Link href="/sa/ca1" className="btn-secondary text-xs">CA1</Link>
               <Link href="/sa/flags" className="btn-secondary text-xs">
                 Flags {stats?.flags_open ? `(${stats.flags_open})` : ''}
               </Link>

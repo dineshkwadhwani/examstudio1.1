@@ -231,6 +231,46 @@ export interface StaffSession {
 
 export type AppSession = StudentSession | StaffSession
 
+// ─── Merged CA1 assessments ─────────────────────────────────
+export type AssessmentType = 'mcq' | 'subjective' | 'subjective_online'
+export type AssessmentPaperStatus = 'pending' | 'in_progress' | 'completed'
+
+export interface Ca1Assessment {
+  id: number
+  name: string
+  assessment_type: AssessmentType
+  total_questions: number
+  total_time_seconds: number | null
+  time_per_question: number | null
+  marks_per_correct: number
+  total_marks: number
+  is_active: boolean
+  created_by_email: string
+  created_at: string
+  question_count?: number
+}
+
+export interface Ca1AssessmentCohort {
+  id: number
+  name: string
+  description: string | null
+  created_by_email: string
+  created_at: string
+  student_count?: number
+}
+
+export interface Ca1AssessmentPaper {
+  id: number
+  assessment_id: number
+  student_id: number
+  started_at: string | null
+  submitted_at: string | null
+  score: number | null
+  status: AssessmentPaperStatus
+  created_at: string
+  assessment?: Ca1Assessment
+}
+
 // ─── API response helpers ─────────────────────────────────────
 export interface ApiError {
   error: string

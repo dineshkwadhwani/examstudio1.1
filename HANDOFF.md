@@ -319,6 +319,38 @@ Role:     sa
 
 231 entries: 230 students + Dinesh Wadhwani (PRN: 1234).
 
+## 10. Merged CA1 Assessments
+
+The original nested Symbi Assess application has been merged into the root
+Exam Studio application. Migration `021_ca1_assessment_merge.sql` creates the
+root-owned assessment, cohort, assignment, paper, answer, and evaluation tables
+and imports historical data from the former `public.profiles`, `assessments`,
+`cohorts`, `assignments`, `student_papers`, and related tables when they exist.
+
+Student identity is resolved by `lower(trim(email))` against the canonical
+`ca1_students.email`. Unmatched legacy profiles are recorded in
+`ca1_assessment_identity_issues`; they are not silently assigned to another
+student. The original legacy profile UUID is retained in
+`ca1_assessment_identity_map` for traceability.
+
+Migration `022_ca1_cohort_members_backfill.sql` safely repeats the legacy
+cohort and cohort-member import for installations where the old tables were
+unavailable when migration 021 first ran. It resolves members directly by
+normalized email and records unmatched rows.
+
+Migration `023_ca1_legacy_students_union.sql` adds legacy-only users with
+available PRN, name, and email to the canonical root student directory. These
+accounts have no usable password and are marked `must_change_password` until
+the Super Admin provisions access.
+
+Migration `024_ca1_legacy_prn_id_backfill.sql` handles the legacy Symbi Assess
+profile shape where the PRN is stored as `prn_id`.
+
+Super Admin assessment management is available at `/sa/ca1/assessments`, with
+results at `/sa/ca1/results`. Students access assigned and completed
+assessments at `/assessments`. The migration is additive and does not alter the
+existing practical-exam, team, artifact, grading, or CA3 presentation tables.
+
 ---
 
 ## 10. API Reference

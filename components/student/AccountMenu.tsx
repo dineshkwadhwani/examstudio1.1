@@ -72,6 +72,7 @@ export function AccountMenu() {
         <nav aria-label="Student account" onClick={() => { if (menu.current) menu.current.open = false }}>
           <Link href="/profile" className="block rounded-lg px-3 py-2 hover:bg-gray-100">My profile</Link>
           <Link href="/my-exams" className="block rounded-lg px-3 py-2 hover:bg-gray-100">My Exams</Link>
+          <Link href="/assessments" className="block rounded-lg px-3 py-2 hover:bg-gray-100">CA1 Assessments</Link>
           <Link href="/team" className="block rounded-lg px-3 py-2 hover:bg-gray-100">My Team</Link>
           <Link href="/dashboard" className="block rounded-lg px-3 py-2 hover:bg-gray-100">Dashboard</Link>
         </nav>

@@ -5,7 +5,7 @@ export function PageHeader({ title }: { title: string }) {
   return <header className="sticky top-0 z-20 border-b border-gray-200 bg-white">
     <div className="mx-auto flex max-w-4xl flex-wrap items-center justify-between gap-3 px-4 py-3">
       <div><Link href="/dashboard" className="text-xs text-blue-700">Exam Studio</Link><h1 className="text-xl font-bold text-gray-900">{title}</h1></div>
-      <AccountMenu />
+      <div className="flex items-center gap-3"><Link href="/assessments" className="hidden text-sm font-semibold text-blue-700 hover:text-blue-900 sm:inline">CA1 Assessments</Link><AccountMenu /></div>
     </div>
   </header>
 }
