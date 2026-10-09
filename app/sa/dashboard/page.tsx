@@ -285,10 +285,10 @@ export default function SADashboard() {
               </div>
             )}
             <nav className="flex gap-2">
-            <Link href="/sa/teams" className="btn-secondary text-xs">CA3</Link>
-              <Link href="/sa/students" className="btn-secondary text-xs">CA2</Link>
-            <Link href="/sa/student-overview" className="btn-secondary text-xs">Students</Link>
               <Link href="/sa/ca1" className="btn-secondary text-xs">CA1</Link>
+              <Link href="/sa/students" className="btn-secondary text-xs">CA2</Link>
+              <Link href="/sa/teams" className="btn-secondary text-xs">CA3</Link>
+              <Link href="/sa/student-overview" className="btn-secondary text-xs">Students</Link>
               <Link href="/sa/flags" className="btn-secondary text-xs">
                 Flags {stats?.flags_open ? `(${stats.flags_open})` : ''}
               </Link>
