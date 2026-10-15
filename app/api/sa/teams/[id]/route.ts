@@ -30,7 +30,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
   const { id } = await params
   const teamId = Number(id)
   if (!Number.isSafeInteger(teamId)) return badRequest('Invalid team ID.')
-  let body: { action?: string; name?: string; project_name?: string; project_description?: string; project_strength?: number | string | null; review_comments?: string | null; prn?: string }
+  let body: { action?: string; name?: string; project_name?: string; project_description?: string; project_strength?: number | string | null; review_comments?: string | null; assessment_review_comments?: string | null; prn?: string }
   try { body = await req.json() } catch { return badRequest('Invalid JSON body.') }
   const { data: team } = await db.from('ca1_teams').select('id, name').eq('id', teamId).single()
   if (!team) return err('not_found', 'Team not found.', 404)
@@ -39,7 +39,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
     const strength = body.project_strength === '' || body.project_strength === null || body.project_strength === undefined ? null : Number(body.project_strength)
     if (strength !== null && (!Number.isFinite(strength) || strength < 0 || strength > 10)) return badRequest('Project strength must be between 0 and 10.')
     const now = new Date().toISOString()
-    const { error } = await db.from('ca1_teams').update({ project_strength: strength, review_comments: body.review_comments?.trim() || null, reviewed_at: now, reviewed_by: staff.id, updated_at: now }).eq('id', teamId)
+    const { error } = await db.from('ca1_teams').update({ project_strength: strength, review_comments: body.review_comments?.trim() || null, assessment_review_comments: body.assessment_review_comments?.trim() || null, reviewed_at: now, reviewed_by: staff.id, updated_at: now }).eq('id', teamId)
     if (error) return serverError('Could not save the project review.')
     await audit(`staff:${staff.id}`, 'team_review_saved', `team:${teamId}`, { project_strength: strength })
     return ok({ message: 'Project review saved.' })
@@ -51,7 +51,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
     const strength = body.project_strength === '' || body.project_strength === null || body.project_strength === undefined ? null : Number(body.project_strength)
     if (strength !== null && (!Number.isFinite(strength) || strength < 0 || strength > 10)) return badRequest('Project strength must be between 0 and 10.')
     const now = new Date().toISOString()
-    const { error } = await db.from('ca1_teams').update({ name, project_name: body.project_name?.trim() || null, project_description: body.project_description?.trim() || null, project_strength: strength, review_comments: body.review_comments?.trim() || null, reviewed_at: now, reviewed_by: staff.id, updated_at: now }).eq('id', teamId)
+    const { error } = await db.from('ca1_teams').update({ name, project_name: body.project_name?.trim() || null, project_description: body.project_description?.trim() || null, project_strength: strength, review_comments: body.review_comments?.trim() || null, assessment_review_comments: body.assessment_review_comments?.trim() || null, reviewed_at: now, reviewed_by: staff.id, updated_at: now }).eq('id', teamId)
     if (error?.code === '23505') return conflict('team_name_taken', 'A team with this name already exists.')
     if (error) return serverError('Could not save the team.')
     await audit(`staff:${staff.id}`, 'team_edited', `team:${teamId}`)
