@@ -3,12 +3,18 @@ import { db, audit } from '@/lib/db'
 import { badRequest, conflict, forbidden, notFound, ok, serverError } from '@/lib/api'
 import { requireSA } from '@/lib/session'
 import { CA3_RUBRIC, CA3_INDIVIDUAL_MAX_MARKS, rubricCategory } from '@/lib/ca3-rubric'
-import { analyzeGithubTeam } from '@/lib/github-analysis'
-import { evaluateCa3Category } from '@/lib/ca3-ai-evaluation'
+
+export const runtime = 'nodejs'
 
 function teamIdFrom(value: string) {
   const id = Number(value)
   return Number.isSafeInteger(id) && id > 0 ? id : null
+}
+
+function databaseErrorCode(error: unknown) {
+  if (!error || typeof error !== 'object') return ''
+  const code = (error as { code?: unknown }).code
+  return typeof code === 'string' && code ? ` (database error ${code})` : ''
 }
 
 export async function GET(_request: NextRequest, { params }: { params: Promise<{ teamId: string }> }) {
@@ -30,11 +36,11 @@ export async function GET(_request: NextRequest, { params }: { params: Promise<{
 
   if (teamResult.error) {
     console.error('Load SA project team error:', teamResult.error)
-    return serverError('Could not load project details.')
+    return serverError(`Could not load project details${databaseErrorCode(teamResult.error)}.`)
   }
   if (artifactsResult.error) {
     console.error('Load SA project artifacts error:', artifactsResult.error)
-    return serverError('Could not load project artifacts.')
+    return serverError(`Could not load project artifacts${databaseErrorCode(artifactsResult.error)}.`)
   }
   if (!teamResult.data) return notFound('Project not found.')
 
@@ -92,6 +98,7 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
       return badRequest('Invalid automated evaluation category.')
     }
     try {
+      const { evaluateCa3Category } = await import('@/lib/ca3-ai-evaluation')
       const result = await evaluateCa3Category(teamId, category)
       await audit(`staff:${staff.id}`, 'ca3_ai_category_evaluated', `team:${teamId}`, { category, score: result.score, model: result.model })
       return ok(result)
@@ -105,6 +112,7 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
   }
 
   if (body.action === 'analyze_github') {
+    const { analyzeGithubTeam } = await import('@/lib/github-analysis')
     const { data: artifact } = await db.from('ca1_project_artifacts').select('status, github_repo_url').eq('team_id', teamId).maybeSingle()
     if (!artifact || artifact.status !== 'submitted') return conflict('not_submitted', 'The team must submit its artifacts before GitHub analysis.')
     if (!artifact.github_repo_url) return badRequest('The team has not provided a GitHub repository URL.')
