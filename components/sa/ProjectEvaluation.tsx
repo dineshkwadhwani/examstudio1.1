@@ -47,12 +47,17 @@ export default function ProjectEvaluation({ teamId }: { teamId: string }) {
 
   async function evaluateCategory(category: string) {
     setEvaluatingCategory(category); setMessage(''); setError('')
-    const response = await fetch(`/api/sa/projects/${teamId}`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action: 'analyze_category', category }) })
-    const payload = await response.json().catch(() => ({}))
-    setEvaluatingCategory(null)
-    if (!response.ok) { setError(payload.message ?? 'Automated evaluation failed.'); return }
-    setMessage(`${payload.category} evaluated. Suggested score: ${payload.score}/${payload.max_marks}. Review it before saving final scores.`)
-    await load()
+    try {
+      const response = await fetch(`/api/sa/projects/${teamId}`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action: 'analyze_category', category }) })
+      const payload = await response.json().catch(() => ({}))
+      if (!response.ok) { setError(payload.message ?? `Automated evaluation failed (HTTP ${response.status}).`); return }
+      setMessage(`${payload.category} evaluated. Suggested score: ${payload.score}/${payload.max_marks}. Review it before saving final scores.`)
+      await load()
+    } catch {
+      setError('Could not reach the automated evaluation service. Please try again.')
+    } finally {
+      setEvaluatingCategory(null)
+    }
   }
 
   async function saveScores() {
