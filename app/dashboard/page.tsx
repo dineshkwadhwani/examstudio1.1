@@ -50,6 +50,13 @@ interface ApprovedProject {
   project_name: string | null
 }
 
+interface RegistrationOption {
+  session_id: number
+  label: string
+  code: string
+  title: string
+}
+
 const COLOURS = ['Red', 'Blue', 'Green', 'Orange']
 const COLOUR_STYLES: Record<string, string> = {
   Red:    'bg-red-100 border-red-400 text-red-800 hover:bg-red-200',
@@ -104,6 +111,7 @@ export default function DashboardPage() {
   const [finishError, setFinishError] = useState('')
   const [examCount, setExamCount] = useState<number | null>(null)
   const [approvedProject, setApprovedProject] = useState<ApprovedProject | null>(null)
+  const [registrationOptions, setRegistrationOptions] = useState<RegistrationOption[]>([])
 
   const fetchStatus = useCallback(async () => {
     const statusRes = await fetch('/api/me/status')
@@ -140,19 +148,28 @@ export default function DashboardPage() {
     }
   }, [])
 
+  const fetchRegistrationOptions = useCallback(async () => {
+    const registrationsRes = await fetch('/api/auth/registration-options')
+    if (registrationsRes.ok) {
+      const data = await registrationsRes.json() as { exams?: RegistrationOption[] }
+      setRegistrationOptions(data.exams ?? [])
+    }
+  }, [])
+
   useEffect(() => {
     const initialFetch = setTimeout(() => {
       fetchStatus()
       fetchKeyInfo()
       fetchExamCount()
       fetchApprovedProject()
+      fetchRegistrationOptions()
     }, 0)
     const id = setInterval(fetchStatus, 8_000)
     return () => {
       clearTimeout(initialFetch)
       clearInterval(id)
     }
-  }, [fetchStatus, fetchKeyInfo, fetchExamCount, fetchApprovedProject])
+  }, [fetchStatus, fetchKeyInfo, fetchExamCount, fetchApprovedProject, fetchRegistrationOptions])
 
   async function generateKey(replace = false) {
     setGeneratingKey(true)
@@ -311,6 +328,29 @@ export default function DashboardPage() {
                 <p className="mt-1 text-sm text-green-800">View your team project and submission options.</p>
                 <span className="btn-primary mt-4 inline-flex text-sm">Open project</span>
               </Link>
+            )}
+
+            {registrationOptions.length > 0 && (
+              <section aria-labelledby="open-registrations-title" className="card border-blue-200 bg-blue-50 md:col-span-2">
+                <p className="text-xs font-semibold uppercase tracking-wide text-blue-700">Open now</p>
+                <h2 id="open-registrations-title" className="mt-1 font-semibold text-blue-950">Register for an exam</h2>
+                <p className="mt-1 text-sm text-blue-800">Choose an exam below to create a student account.</p>
+                <div className="mt-4 grid gap-3 md:grid-cols-2">
+                  {registrationOptions.map(exam => (
+                    <Link key={exam.session_id} href="/register" className="rounded-xl border border-blue-200 bg-white p-4 transition hover:border-blue-400 hover:shadow-md">
+                      <div className="flex items-start justify-between gap-3">
+                        <div>
+                          <p className="text-xs font-semibold uppercase tracking-wide text-blue-700">{exam.code}</p>
+                          <h3 className="mt-1 font-semibold text-gray-900">{exam.title}</h3>
+                        </div>
+                        <span className="shrink-0 rounded-full bg-green-100 px-2 py-1 text-xs font-medium text-green-700">Open</span>
+                      </div>
+                      <p className="mt-2 text-sm text-gray-600">{exam.label}</p>
+                      <p className="mt-3 text-sm font-semibold text-blue-700">Register now →</p>
+                    </Link>
+                  ))}
+                </div>
+              </section>
             )}
 
             {registrationOpen && (

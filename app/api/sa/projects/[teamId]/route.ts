@@ -4,6 +4,7 @@ import { badRequest, conflict, forbidden, notFound, ok, serverError } from '@/li
 import { requireSA } from '@/lib/session'
 import { CA3_RUBRIC, CA3_INDIVIDUAL_MAX_MARKS, rubricCategory } from '@/lib/ca3-rubric'
 import { analyzeGithubTeam } from '@/lib/github-analysis'
+import { evaluateCa3Category } from '@/lib/ca3-ai-evaluation'
 
 function teamIdFrom(value: string) {
   const id = Number(value)
@@ -33,8 +34,26 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
   try { staff = await requireSA() } catch { return forbidden('Super Admin access required.') }
   const teamId = teamIdFrom((await params).teamId)
   if (!teamId) return notFound('Project not found.')
-  let body: { action?: string; scores?: Array<{ category?: string; final_score?: number | null; evaluator_notes?: string; override_reason?: string }>; individual?: Array<{ student_id?: number; final_score?: number | null; evaluator_notes?: string; override_reason?: string }> }
+  let body: { action?: string; category?: string; scores?: Array<{ category?: string; final_score?: number | null; evaluator_notes?: string; override_reason?: string }>; individual?: Array<{ student_id?: number; final_score?: number | null; evaluator_notes?: string; override_reason?: string }> }
   try { body = await request.json() } catch { return badRequest('Invalid JSON body.') }
+
+  if (body.action === 'analyze_category') {
+    const category = body.category
+    if (category !== 'multi_agent_design' && category !== 'design' && category !== 'documentation' && category !== 'code_review') {
+      return badRequest('Invalid automated evaluation category.')
+    }
+    try {
+      const result = await evaluateCa3Category(teamId, category)
+      await audit(`staff:${staff.id}`, 'ca3_ai_category_evaluated', `team:${teamId}`, { category, score: result.score, model: result.model })
+      return ok(result)
+    } catch (error) {
+      if (error instanceof Error && error.message === 'NOT_SUBMITTED') return conflict('not_submitted', 'The team must submit its artifacts before automated evaluation.')
+      if (error instanceof Error && error.message === 'GITHUB_URL_INVALID') return badRequest('The GitHub repository URL is invalid.')
+      if (error instanceof Error && error.message === 'GITHUB_REPOSITORY_NOT_FOUND') return badRequest('The GitHub repository could not be found or is not accessible.')
+      console.error('CA3 AI evaluation error:', error)
+      return serverError('Automated evaluation failed. Check the submitted documents and try again.')
+    }
+  }
 
   if (body.action === 'analyze_github') {
     const { data: artifact } = await db.from('ca1_project_artifacts').select('status, github_repo_url').eq('team_id', teamId).maybeSingle()
