@@ -24,6 +24,23 @@ export type ArtifactInput = Partial<Record<typeof ARTIFACT_FIELDS[number], strin
   members?: Array<{ prn: string; github_username: string }>
 }
 
+export type ArtifactValidationCheck = {
+  field: string
+  label: string
+  valid: boolean
+}
+
+const REQUIRED_ARTIFACTS: Array<{ field: typeof ARTIFACT_FIELDS[number]; label: string }> = [
+  { field: 'synopsis_pdf_path', label: 'Project synopsis PDF' },
+  { field: 'design_document_pdf_path', label: 'Design document PDF' },
+  { field: 'input_definition', label: 'Input definition' },
+  { field: 'output_definition', label: 'Output definition' },
+  { field: 'github_repo_url', label: 'GitHub repository URL' },
+  { field: 'project_url', label: 'Project URL' },
+  { field: 'execution_trace', label: 'Execution trace' },
+  { field: 'demo_video_url', label: 'Demo video URL' },
+]
+
 export function isPresentationDate(value: unknown): value is PresentationDate {
   return typeof value === 'string' && (PRESENTATION_DATES as readonly string[]).includes(value)
 }
@@ -42,8 +59,17 @@ export async function getPresentationDateOptions(): Promise<PresentationDateOpti
 }
 
 export function artifactValidationErrors(data: ArtifactInput) {
-  const required = ['synopsis_pdf_path', 'design_document_pdf_path', 'input_definition', 'output_definition', 'github_repo_url', 'project_url', 'execution_trace', 'demo_video_url'] as const
-  return required.filter(field => !data[field]?.trim()).map(field => ({ field, message: `${field.replaceAll('_', ' ')} is required.` }))
+  return artifactValidationChecks(data)
+    .filter(check => !check.valid)
+    .map(check => ({ field: check.field, message: `${check.label} is required.` }))
+}
+
+export function artifactValidationChecks(data: ArtifactInput): ArtifactValidationCheck[] {
+  const checks: ArtifactValidationCheck[] = REQUIRED_ARTIFACTS.map(({ field, label }) => ({ field, label, valid: Boolean(data[field]?.trim()) }))
+  if (data.members) {
+    checks.push({ field: 'members.github_username', label: 'GitHub usernames for all team members', valid: data.members.length > 0 && data.members.every(member => member.github_username.trim()) })
+  }
+  return checks
 }
 
 export async function uploadArtifactPdf(teamId: number, field: 'synopsis' | 'design_document', file: File) {
@@ -113,9 +139,15 @@ export async function submitTeamArtifacts(teamId: number, data: ArtifactInput, a
   const submittedAt = new Date().toISOString()
   const { error } = await db.from('ca1_project_artifacts').upsert({ team_id: teamId, ...artifactData, status: 'submitted', submitted_at: submittedAt, updated_at: submittedAt }, { onConflict: 'team_id' })
   if (error) throw error
+  const { data: verified, error: verificationError } = await db
+    .from('ca1_project_artifacts')
+    .select('status, submitted_at')
+    .eq('team_id', teamId)
+    .maybeSingle()
+  if (verificationError || verified?.status !== 'submitted' || !verified.submitted_at) throw new Error('SUBMISSION_VERIFICATION_FAILED')
   for (const member of data.members ?? []) {
     await db.from('ca1_team_members').update({ github_username: member.github_username.trim() || null }).eq('team_id', teamId).eq('roster_prn', member.prn).is('left_at', null)
   }
   await audit(actor, 'ca3_artifacts_submitted', `team:${teamId}`)
-  return { errors: [] }
+  return { errors: [], submitted_at: verified.submitted_at, checks: artifactValidationChecks(data) }
 }

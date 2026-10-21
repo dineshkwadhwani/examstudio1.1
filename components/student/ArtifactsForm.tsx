@@ -26,6 +26,7 @@ const PRESENTATION_DATE_CAPACITY = 25;
 
 type Member = { prn: string; name: string; github_username: string };
 type FieldName = Exclude<keyof Artifact, 'status'>;
+type SubmissionCheck = { field: string; label: string; valid: boolean };
 
 const fields: Array<{ name: FieldName; label: string; description: string; help?: string; multiline?: boolean; required?: boolean; pdf?: boolean; video?: boolean }> = [
   { name: 'synopsis_pdf_path', label: 'Project synopsis (PDF)', description: 'Summarise the problem, your solution, target user, and project scope.', help: 'PDF only, maximum 10 MB', required: true, pdf: true },
@@ -67,6 +68,7 @@ export default function ArtifactsForm({
   const [savedPresentationDate, setSavedPresentationDate] = useState(initialPresentationDate ?? '');
   const [dateOptions, setDateOptions] = useState(presentationDateOptions);
   const [dateBusy, setDateBusy] = useState(false);
+  const [submissionChecks, setSubmissionChecks] = useState<SubmissionCheck[] | null>(null);
 
   const locked = status === 'locked';
   const canSubmit = useMemo(
@@ -137,12 +139,18 @@ export default function ArtifactsForm({
     setBusy(false);
 
     if (!response.ok) {
-      setError(payload.error ?? 'Unable to save project artifacts.');
+      setError(payload.message ?? payload.error ?? 'Unable to save project artifacts.');
       return;
     }
 
-    if (submit) setStatus('submitted');
-    setMessage(submit ? 'Project submitted successfully.' : 'Draft saved.');
+    if (submit) {
+      setStatus('submitted');
+      setSubmissionChecks(payload.checks ?? []);
+      setMessage(payload.message ?? 'All required artifacts were validated and submitted successfully.');
+    } else {
+      setSubmissionChecks(null);
+      setMessage('Draft saved.');
+    }
   }
 
   async function submit() {
@@ -213,6 +221,7 @@ export default function ArtifactsForm({
       )}
       {message && <p className="mt-5 rounded-lg bg-emerald-50 px-4 py-3 text-sm text-emerald-800">{message}</p>}
       {error && <p role="alert" className="mt-5 rounded-lg bg-red-50 px-4 py-3 text-sm text-red-700">{error}</p>}
+      {submissionChecks && <div className="mt-5 rounded-lg border border-emerald-200 bg-emerald-50 p-4"><h3 className="font-semibold text-emerald-900">Submission verification</h3><ul className="mt-3 grid gap-2 text-sm text-emerald-800 sm:grid-cols-2">{submissionChecks.map((check) => <li key={check.field}>{check.valid ? '✓' : '✕'} {check.label}</li>)}</ul><p className="mt-3 text-sm font-medium text-emerald-900">Submission status: submitted successfully</p></div>}
 
       <div className="mt-6 space-y-5">
         {fields.map(({ name, label, description, help, multiline, required, pdf }) => (
