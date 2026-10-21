@@ -48,6 +48,7 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
   try {
     const body = await request.json()
     if (body.action === 'start') {
+      if (!result.paper.assessment?.is_active) return forbidden('This assessment is currently inactive.')
       const { data, error } = await db.from('ca1_assessment_papers')
         .update({ status: 'in_progress', started_at: result.paper.started_at ?? new Date().toISOString() })
         .eq('id', id).eq('student_id', session.id).select().single()

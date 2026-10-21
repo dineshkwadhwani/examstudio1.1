@@ -16,10 +16,11 @@ export default async function AssessmentsPage() {
         {papers.map(paper => {
           const assessment = paper.assessment
           const completed = paper.status === 'completed'
+          const canStart = assessment?.is_active === true
           return <section key={paper.id} className="card space-y-3">
             <div className="flex items-start justify-between gap-3"><div><h2 className="font-semibold text-gray-900">{assessment?.name}</h2><p className="mt-1 text-xs text-gray-500">{assessment?.assessment_type} · {assessment?.total_questions} questions · {assessment?.total_marks} marks</p></div><span className={completed ? 'badge-green' : paper.status === 'in_progress' ? 'badge-blue' : 'badge-gray'}>{completed ? 'Completed' : paper.status.replace('_', ' ')}</span></div>
             {completed && <p className="text-sm text-gray-700">Score: <strong>{paper.score ?? 0} / {assessment?.total_marks}</strong></p>}
-            <Link href={`/assessments/${paper.id}`} className="btn-primary inline-flex text-sm">{completed ? 'View result' : paper.status === 'in_progress' ? 'Continue' : 'Start assessment'}</Link>
+            {completed ? <Link href={`/assessments/${paper.id}`} className="btn-primary inline-flex text-sm">View result</Link> : paper.status === 'in_progress' ? <Link href={`/assessments/${paper.id}`} className="btn-primary inline-flex text-sm">Continue</Link> : canStart ? <Link href={`/assessments/${paper.id}`} className="btn-primary inline-flex text-sm">Start assessment</Link> : <span className="inline-flex cursor-not-allowed rounded-lg bg-gray-200 px-4 py-2 text-sm font-semibold text-gray-500">Assessment unavailable</span>}
           </section>
         })}
       </div>}
