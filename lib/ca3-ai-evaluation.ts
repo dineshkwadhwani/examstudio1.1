@@ -2,7 +2,10 @@ import { PDFParse } from 'pdf-parse'
 import { db } from './db'
 import type { CA3Category } from './ca3-rubric'
 
-const GROQ_MODEL = process.env.GROQ_CA3_MODEL ?? 'qwen/qwen3.8-27b'
+const configuredModel = process.env.GROQ_CA3_MODEL?.trim()
+const GROQ_MODEL = configuredModel && configuredModel !== 'llama-3.3-70b-versatile'
+  ? configuredModel
+  : 'qwen/qwen3.8-27b'
 const MAX_DOCUMENT_CHARS = 70_000
 const MAX_REPOSITORY_CHARS = 90_000
 const MAX_REPOSITORY_FILES = 60
@@ -115,8 +118,15 @@ async function groqJson(system: string, user: string): Promise<EvaluationResult>
   })
   if (!response.ok) throw new Error(`GROQ_API_ERROR_${response.status}`)
   const payload = await response.json() as { choices?: Array<{ message?: { content?: string } }> }
+  const content = payload.choices?.[0]?.message?.content ?? ''
+  const jsonContent = content.replace(/^```(?:json)?\s*/i, '').replace(/\s*```$/i, '').trim()
+  const objectStart = jsonContent.indexOf('{')
+  const objectEnd = jsonContent.lastIndexOf('}')
   let parsed: Partial<EvaluationResult>
-  try { parsed = JSON.parse(payload.choices?.[0]?.message?.content ?? '{}') as Partial<EvaluationResult> } catch { throw new Error('GROQ_INVALID_JSON') }
+  try {
+    const objectContent = objectStart >= 0 && objectEnd > objectStart ? jsonContent.slice(objectStart, objectEnd + 1) : jsonContent
+    parsed = JSON.parse(objectContent) as Partial<EvaluationResult>
+  } catch { throw new Error('GROQ_INVALID_JSON') }
   const score = Number(parsed.score)
   if (!Number.isFinite(score)) throw new Error('GROQ_INVALID_SCORE')
   return {

@@ -108,6 +108,7 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
       if (error instanceof Error && error.message === 'GITHUB_REPOSITORY_NOT_FOUND') return badRequest('The GitHub repository could not be found or is not accessible.')
       if (error instanceof Error && error.message === 'GROQ_API_KEY is not configured.') return serverError('Groq evaluation is not configured on the server.')
       if (error instanceof Error && /^GROQ_API_ERROR_\d+$/.test(error.message)) return serverError(`Groq evaluation failed (${error.message.replace('GROQ_API_ERROR_', 'HTTP ')}).`)
+      if (error instanceof Error && ['GROQ_INVALID_JSON', 'GROQ_INVALID_SCORE'].includes(error.message)) return serverError(`Groq returned an invalid evaluation response (${error.message.replace('GROQ_', '').toLowerCase().replace('_', ' ')}). Please try again.`)
       if (error instanceof Error && error.message.includes('submitted PDF')) return serverError(error.message)
       console.error('CA3 AI evaluation error:', error)
       return serverError('Automated evaluation failed. Check the submitted documents and try again.')
