@@ -22,7 +22,7 @@ export default function ProjectEvaluation({ teamId }: { teamId: string }) {
   const load = useCallback(async () => {
     const response = await fetch(`/api/sa/projects/${teamId}`)
     const payload = await response.json().catch(() => ({}))
-    if (!response.ok) { setError(payload.message ?? 'Could not load project evaluation.'); return }
+    if (!response.ok) { setError(payload.message ?? `Could not load project evaluation (HTTP ${response.status}).`); return }
     const evaluation = payload as Evaluation
     setData(evaluation)
     setScores(Object.fromEntries(evaluation.scores.map(score => [score.category, score.final_score == null ? '' : String(score.final_score)])))

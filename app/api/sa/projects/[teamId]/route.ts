@@ -16,15 +16,18 @@ export async function GET(_request: NextRequest, { params }: { params: Promise<{
   try { staff = await requireSA() } catch { return forbidden('Super Admin access required.') }
   const teamId = teamIdFrom((await params).teamId)
   if (!teamId) return notFound('Project not found.')
-  const [teamResult, artifactsResult, membersResult, scoresResult, individualResult, githubStatsResult, configResult] = await Promise.all([
-    db.from('ca1_teams').select('id, name, project_name, project_description, status').eq('id', teamId).maybeSingle(),
-    db.from('ca1_project_artifacts').select('*').eq('team_id', teamId).maybeSingle(),
-    db.from('ca1_team_members').select('roster_prn, student_id, github_username, ca1_roster!inner(name)').eq('team_id', teamId).is('left_at', null).order('joined_at'),
-    db.from('ca1_project_scores').select('*').eq('team_id', teamId),
-    db.from('ca1_project_individual_scores').select('*').eq('team_id', teamId),
-    db.from('ca1_github_contribution_stats').select('*').eq('team_id', teamId),
-    db.from('ca1_ca3_config').select('results_published').eq('id', true).maybeSingle(),
-  ])
+  let teamResult
+  let artifactsResult
+  try {
+    [teamResult, artifactsResult] = await Promise.all([
+      db.from('ca1_teams').select('id, name, project_name, project_description, status').eq('id', teamId).maybeSingle(),
+      db.from('ca1_project_artifacts').select('*').eq('team_id', teamId).maybeSingle(),
+    ])
+  } catch (error) {
+    console.error('Load SA project details error:', error)
+    return serverError('Could not load project details.')
+  }
+
   if (teamResult.error) {
     console.error('Load SA project team error:', teamResult.error)
     return serverError('Could not load project details.')
@@ -34,6 +37,24 @@ export async function GET(_request: NextRequest, { params }: { params: Promise<{
     return serverError('Could not load project artifacts.')
   }
   if (!teamResult.data) return notFound('Project not found.')
+
+  let membersResult
+  let scoresResult
+  let individualResult
+  let githubStatsResult
+  let configResult
+  try {
+    [membersResult, scoresResult, individualResult, githubStatsResult, configResult] = await Promise.all([
+      db.from('ca1_team_members').select('roster_prn, student_id, github_username, ca1_roster!inner(name)').eq('team_id', teamId).is('left_at', null).order('joined_at'),
+      db.from('ca1_project_scores').select('*').eq('team_id', teamId),
+      db.from('ca1_project_individual_scores').select('*').eq('team_id', teamId),
+      db.from('ca1_github_contribution_stats').select('*').eq('team_id', teamId),
+      db.from('ca1_ca3_config').select('results_published').eq('id', true).maybeSingle(),
+    ])
+  } catch (error) {
+    console.error('Load optional SA project data error:', error)
+    return ok({ team: teamResult.data, artifacts: artifactsResult.data, members: [], scores: [], individual: [], github_stats: [], config: null, rubric: CA3_RUBRIC, individual_max_marks: CA3_INDIVIDUAL_MAX_MARKS, reviewer: staff.id })
+  }
 
   // Optional scoring/analytics tables should not prevent the Super Admin from
   // viewing the team and its saved artifact fields.
