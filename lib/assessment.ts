@@ -83,7 +83,10 @@ export async function getAssessmentPaper(id: number, studentId?: number) {
 
   return {
     paper: { ...paper, assessment: Array.isArray(paper.ca1_assessments) ? paper.ca1_assessments[0] : paper.ca1_assessments },
-    questions: (questions ?? []).map(row => ({ ...row, question: row.ca1_assessment_questions })),
+    questions: (questions ?? []).map(row => ({
+      ...row,
+      question: Array.isArray(row.ca1_assessment_questions) ? row.ca1_assessment_questions[0] : row.ca1_assessment_questions,
+    })),
   }
 }
 
