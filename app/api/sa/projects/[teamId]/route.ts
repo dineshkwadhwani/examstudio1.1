@@ -16,7 +16,7 @@ export async function GET(_request: NextRequest, { params }: { params: Promise<{
   try { staff = await requireSA() } catch { return forbidden('Super Admin access required.') }
   const teamId = teamIdFrom((await params).teamId)
   if (!teamId) return notFound('Project not found.')
-  const [{ data: team }, { data: artifacts }, { data: members }, { data: scores }, { data: individual }, { data: githubStats }, { data: config }] = await Promise.all([
+  const [teamResult, artifactsResult, membersResult, scoresResult, individualResult, githubStatsResult, configResult] = await Promise.all([
     db.from('ca1_teams').select('id, name, project_name, project_description, status').eq('id', teamId).maybeSingle(),
     db.from('ca1_project_artifacts').select('*').eq('team_id', teamId).maybeSingle(),
     db.from('ca1_team_members').select('roster_prn, student_id, github_username, ca1_roster!inner(name)').eq('team_id', teamId).is('left_at', null).order('joined_at'),
@@ -25,8 +25,36 @@ export async function GET(_request: NextRequest, { params }: { params: Promise<{
     db.from('ca1_github_contribution_stats').select('*').eq('team_id', teamId),
     db.from('ca1_ca3_config').select('results_published').eq('id', true).maybeSingle(),
   ])
-  if (!team) return notFound('Project not found.')
-  return ok({ team, artifacts, members: members ?? [], scores: scores ?? [], individual: individual ?? [], github_stats: githubStats ?? [], config, rubric: CA3_RUBRIC, individual_max_marks: CA3_INDIVIDUAL_MAX_MARKS, reviewer: staff.id })
+  if (teamResult.error) {
+    console.error('Load SA project team error:', teamResult.error)
+    return serverError('Could not load project details.')
+  }
+  if (artifactsResult.error) {
+    console.error('Load SA project artifacts error:', artifactsResult.error)
+    return serverError('Could not load project artifacts.')
+  }
+  if (!teamResult.data) return notFound('Project not found.')
+
+  // Optional scoring/analytics tables should not prevent the Super Admin from
+  // viewing the team and its saved artifact fields.
+  if (membersResult.error) console.error('Load SA project members error:', membersResult.error)
+  if (scoresResult.error) console.error('Load SA project scores error:', scoresResult.error)
+  if (individualResult.error) console.error('Load SA project individual scores error:', individualResult.error)
+  if (githubStatsResult.error) console.error('Load SA project GitHub stats error:', githubStatsResult.error)
+  if (configResult.error) console.error('Load SA CA3 config error:', configResult.error)
+
+  return ok({
+    team: teamResult.data,
+    artifacts: artifactsResult.data,
+    members: membersResult.data ?? [],
+    scores: scoresResult.data ?? [],
+    individual: individualResult.data ?? [],
+    github_stats: githubStatsResult.data ?? [],
+    config: configResult.data,
+    rubric: CA3_RUBRIC,
+    individual_max_marks: CA3_INDIVIDUAL_MAX_MARKS,
+    reviewer: staff.id,
+  })
 }
 
 export async function POST(request: NextRequest, { params }: { params: Promise<{ teamId: string }> }) {
