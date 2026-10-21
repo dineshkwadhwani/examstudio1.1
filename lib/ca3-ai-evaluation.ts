@@ -29,6 +29,13 @@ type EvaluationResult = {
   confidence: 'low' | 'medium' | 'high'
 }
 
+export class Ca3EvaluationError extends Error {
+  constructor(public readonly stage: string, message: string, options?: { cause?: unknown }) {
+    super(message, options)
+    this.name = 'Ca3EvaluationError'
+  }
+}
+
 const CATEGORY_INSTRUCTIONS: Record<Extract<CA3Category, 'multi_agent_design' | 'design' | 'documentation' | 'code_review'>, string> = {
   multi_agent_design: 'Evaluate whether the project demonstrates at least four genuinely distinct, coordinating agents, clear responsibilities, agentic behaviour, and evidence of planning, tool use, memory, adaptation, or replanning. Use the design document, execution trace, and repository snapshot.',
   design: 'Evaluate the architecture, agent roles, communication/orchestration pattern, technology choices, input/output design, and whether the design is coherent and technically justified. Use the design document, input/output definitions, and execution trace.',
@@ -44,10 +51,11 @@ function trimText(value: string | null | undefined, limit = MAX_DOCUMENT_CHARS) 
 async function extractPdf(path: string | null) {
   if (!path) return '[not submitted]'
   const { data, error } = await db.storage.from('ca3-artifacts').download(path)
-  if (error || !data) throw new Error('Could not download a submitted PDF for evaluation.')
+  if (error || !data) throw new Ca3EvaluationError('pdf_download', 'Could not download a submitted PDF for evaluation.')
   const parser = new PDFParse({ data: new Uint8Array(await data.arrayBuffer()) })
   try {
     const result = await parser.getText()
+    if (!result.text.trim()) throw new Ca3EvaluationError('pdf_text_extraction', 'The submitted PDF contains no readable text.')
     return trimText(result.text)
   } finally {
     await parser.destroy()
@@ -102,7 +110,7 @@ async function repositorySnapshot(repositoryUrl: string) {
 
 async function groqJson(system: string, user: string): Promise<EvaluationResult> {
   const apiKey = process.env.GROQ_API_KEY
-  if (!apiKey) throw new Error('GROQ_API_KEY is not configured.')
+  if (!apiKey) throw new Ca3EvaluationError('groq_configuration', 'GROQ_API_KEY is not configured.')
   const response = await fetch('https://api.groq.com/openai/v1/chat/completions', {
     method: 'POST',
     headers: { Authorization: `Bearer ${apiKey}`, 'Content-Type': 'application/json' },
@@ -119,7 +127,7 @@ async function groqJson(system: string, user: string): Promise<EvaluationResult>
   if (!response.ok) {
     const errorBody = (await response.text()).replace(/\s+/g, ' ').trim().slice(0, 300)
     console.error('CA3 Groq request failed:', { model: GROQ_MODEL, status: response.status, body: errorBody })
-    throw new Error(`GROQ_API_ERROR_${response.status}${errorBody ? `: ${errorBody}` : ''}`)
+    throw new Ca3EvaluationError('groq_request', `GROQ_API_ERROR_${response.status}${errorBody ? `: ${errorBody}` : ''}`)
   }
   const payload = await response.json() as { choices?: Array<{ message?: { content?: string } }> }
   const content = payload.choices?.[0]?.message?.content ?? ''
@@ -131,9 +139,9 @@ async function groqJson(system: string, user: string): Promise<EvaluationResult>
   try {
     const objectContent = objectStart >= 0 && objectEnd > objectStart ? jsonContent.slice(objectStart, objectEnd + 1) : jsonContent
     parsed = JSON.parse(objectContent) as Partial<EvaluationResult>
-  } catch { throw new Error('GROQ_INVALID_JSON') }
+  } catch { throw new Ca3EvaluationError('groq_response_parsing', 'GROQ_INVALID_JSON') }
   const score = Number(parsed.score)
-  if (!Number.isFinite(score)) throw new Error('GROQ_INVALID_SCORE')
+  if (!Number.isFinite(score)) throw new Ca3EvaluationError('groq_response_parsing', 'GROQ_INVALID_SCORE')
   return {
     score,
     feedback: String(parsed.feedback ?? ''),
@@ -145,7 +153,7 @@ async function groqJson(system: string, user: string): Promise<EvaluationResult>
 
 export async function evaluateCa3Category(teamId: number, category: 'multi_agent_design' | 'design' | 'documentation' | 'code_review') {
   const { data: artifact, error } = await db.from('ca1_project_artifacts').select('*').eq('team_id', teamId).maybeSingle()
-  if (error) throw error
+  if (error) throw new Ca3EvaluationError('artifact_load', 'Could not load the submitted artifact record.', { cause: error })
   if (!artifact || artifact.status !== 'submitted') throw new Error('NOT_SUBMITTED')
   const row = artifact as ArtifactRow
   const [synopsis, design] = await Promise.all([extractPdf(row.synopsis_pdf_path), extractPdf(row.design_document_pdf_path)])
@@ -181,7 +189,7 @@ export async function evaluateCa3Category(teamId: number, category: 'multi_agent
   if (saveError) {
     const code = typeof saveError.code === 'string' ? saveError.code : 'UNKNOWN'
     console.error('CA3 AI response received, but saving the suggested score failed:', { teamId, category, code })
-    throw new Error(`AI_SCORE_SAVE_FAILED_${code}`)
+    throw new Ca3EvaluationError('score_save', `AI_SCORE_SAVE_FAILED_${code}`, { cause: saveError })
   }
   return { category, max_marks: rubric, ...result, score, model: GROQ_MODEL }
 }
