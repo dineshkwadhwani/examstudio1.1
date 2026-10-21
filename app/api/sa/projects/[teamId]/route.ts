@@ -17,6 +17,16 @@ function databaseErrorCode(error: unknown) {
   return typeof code === 'string' && code ? ` (database error ${code})` : ''
 }
 
+function safeEvaluationDiagnostic(error: unknown) {
+  const raw = error instanceof Error ? `${error.name}: ${error.message}` : String(error)
+  return raw
+    .replace(/gsk_[A-Za-z0-9_-]+/g, '[redacted-key]')
+    .replace(/Bearer\s+\S+/gi, 'Bearer [redacted]')
+    .replace(/\s+/g, ' ')
+    .trim()
+    .slice(0, 240)
+}
+
 export async function GET(_request: NextRequest, { params }: { params: Promise<{ teamId: string }> }) {
   let staff
   try { staff = await requireSA() } catch { return forbidden('Super Admin access required.') }
@@ -121,7 +131,7 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
       if (error instanceof Error && error.message.startsWith('AI_SCORE_SAVE_FAILED_')) return serverError(`Groq returned a response, but the suggested score could not be saved (database error ${error.message.replace('AI_SCORE_SAVE_FAILED_', '')}). Apply migration 027_ca3_ai_evaluation_feedback.sql, then try again. Debug ID: ${debugId}`)
       if (error instanceof Error && error.message.includes('submitted PDF')) return serverError(error.message)
       if (error instanceof Error && error.name === 'Ca3EvaluationError') return serverError(`Automated evaluation failed during ${((error as Error & { stage?: string }).stage ?? 'unknown').replaceAll('_', ' ')}. Debug ID: ${debugId}`)
-      return serverError(`Automated evaluation failed. Debug ID: ${debugId}`)
+      return serverError(`Automated evaluation failed (${safeEvaluationDiagnostic(error)}). Debug ID: ${debugId}`)
     }
   }
 
