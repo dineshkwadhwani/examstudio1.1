@@ -2,7 +2,7 @@ import { PDFParse } from 'pdf-parse'
 import { db } from './db'
 import type { CA3Category } from './ca3-rubric'
 
-const GROQ_MODEL = process.env.GROQ_CA3_MODEL ?? 'llama-3.3-70b-versatile'
+const GROQ_MODEL = process.env.GROQ_CA3_MODEL ?? 'qwen/qwen3.8-27b'
 const MAX_DOCUMENT_CHARS = 70_000
 const MAX_REPOSITORY_CHARS = 90_000
 const MAX_REPOSITORY_FILES = 60
