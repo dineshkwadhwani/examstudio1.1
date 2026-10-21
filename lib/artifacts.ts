@@ -6,9 +6,8 @@ export const ARTIFACT_FIELDS = [
 ] as const
 
 export const PRESENTATION_DATES = [
-  '2026-10-09',
-  '2026-10-15',
-  '2026-10-16',
+  '2026-10-22',
+  '2026-10-23',
 ] as const
 
 export const PRESENTATION_DATE_CAPACITY = 25

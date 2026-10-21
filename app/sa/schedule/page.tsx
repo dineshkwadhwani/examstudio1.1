@@ -6,8 +6,8 @@ import { useRouter } from 'next/navigation'
 
 type ScheduleTeam = { id: number; name: string; project_name: string | null; status: string; presentation_date: string | null }
 const dateGroups = [
-  { date: '2026-10-15', label: '15 October 2026' },
-  { date: '2026-10-16', label: '16 October 2026' },
+  { date: '2026-10-22', label: '22 October 2026' },
+  { date: '2026-10-23', label: '23 October 2026' },
   { date: null, label: 'No presentation date selected' },
 ] as const
 

@@ -17,7 +17,7 @@ type Artifact = {
 };
 
 type PresentationDateOption = {
-  date: '2026-10-09' | '2026-10-15' | '2026-10-16';
+  date: '2026-10-22' | '2026-10-23';
   booked_slots: number;
   available_slots: number;
 };
@@ -27,15 +27,15 @@ const PRESENTATION_DATE_CAPACITY = 25;
 type Member = { prn: string; name: string; github_username: string };
 type FieldName = Exclude<keyof Artifact, 'status'>;
 
-const fields: Array<{ name: FieldName; label: string; help?: string; multiline?: boolean; required?: boolean; pdf?: boolean; video?: boolean }> = [
-  { name: 'synopsis_pdf_path', label: 'Project synopsis (PDF)', help: 'PDF only, maximum 10 MB', required: true, pdf: true },
-  { name: 'design_document_pdf_path', label: 'Design document (PDF)', help: 'PDF only, maximum 10 MB', required: true, pdf: true },
-  { name: 'input_definition', label: 'Input definition', multiline: true, required: true },
-  { name: 'output_definition', label: 'Output definition', multiline: true, required: true },
-  { name: 'github_repo_url', label: 'GitHub repository URL', required: true },
-  { name: 'project_url', label: 'Project URL', required: true },
-  { name: 'execution_trace', label: 'Execution trace', multiline: true, required: true },
-  { name: 'demo_video_url', label: 'Demo video URL', help: 'Required', required: true },
+const fields: Array<{ name: FieldName; label: string; description: string; help?: string; multiline?: boolean; required?: boolean; pdf?: boolean; video?: boolean }> = [
+  { name: 'synopsis_pdf_path', label: 'Project synopsis (PDF)', description: 'Summarise the problem, your solution, target user, and project scope.', help: 'PDF only, maximum 10 MB', required: true, pdf: true },
+  { name: 'design_document_pdf_path', label: 'Design document (PDF)', description: 'Show the architecture, agent roles, communication pattern, and technology choices.', help: 'PDF only, maximum 10 MB', required: true, pdf: true },
+  { name: 'input_definition', label: 'Input definition', description: 'Explain what your system accepts, including its format/schema and one real example.', multiline: true, required: true },
+  { name: 'output_definition', label: 'Output definition', description: 'Explain what your system produces, including its format/schema and one real example.', multiline: true, required: true },
+  { name: 'github_repo_url', label: 'GitHub repository URL', description: 'Paste the repository evaluators will review; ensure it is public or shared with the evaluator.', required: true },
+  { name: 'project_url', label: 'Project URL', description: 'Paste the live deployment URL that evaluators can open and test during the demo.', required: true },
+  { name: 'execution_trace', label: 'Execution trace', description: 'Provide a real captured run showing messages and handoffs between your agents.', multiline: true, required: true },
+  { name: 'demo_video_url', label: 'Demo video URL', description: 'Share a 2–3 minute walkthrough of the working system as backup evidence for the live demo.', help: 'Required', required: true },
 ];
 
 function initialValues(artifacts: Artifact | null) {
@@ -215,12 +215,12 @@ export default function ArtifactsForm({
       {error && <p role="alert" className="mt-5 rounded-lg bg-red-50 px-4 py-3 text-sm text-red-700">{error}</p>}
 
       <div className="mt-6 space-y-5">
-        {fields.map(({ name, label, help, multiline, required, pdf }) => (
+        {fields.map(({ name, label, description, help, multiline, required, pdf }) => (
           <label key={name} className="block">
             <span className="text-sm font-medium text-slate-800">
               {label} {required && <span className="text-red-600">*</span>}
             </span>
-            {help && <span className="ml-2 text-xs text-slate-500">({help})</span>}
+            <span className="mt-1 block text-xs leading-5 text-slate-500">{description}{help && <> <span className="text-slate-400">({help})</span></>}</span>
             {pdf ? (
               <>
                 <input

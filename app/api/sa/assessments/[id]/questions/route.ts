@@ -63,3 +63,42 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
     return serverError(error instanceof Error ? error.message : 'Could not save questions.')
   }
 }
+
+export async function PATCH(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
+  try {
+    const staff = await requireSA()
+    const assessmentId = Number((await params).id)
+    if (!Number.isInteger(assessmentId) || assessmentId < 1) return badRequest('Invalid assessment ID.')
+    const { data: assessment } = await db.from('ca1_assessments').select('id, assessment_type').eq('id', assessmentId).single()
+    if (!assessment) return badRequest('Assessment not found.')
+
+    const body = await request.json() as Record<string, unknown>
+    const questionId = Number(body.question_id)
+    const questionText = String(body.question_text ?? '').trim()
+    const options = body.options
+    const correctAnswer = body.correct_answer == null ? null : String(body.correct_answer).trim().toUpperCase()
+    if (!Number.isInteger(questionId) || questionId < 1) return badRequest('Invalid question ID.')
+    if (!questionText) return badRequest('Question text is required.')
+    if (!options || typeof options !== 'object' || Array.isArray(options)) return badRequest('Question options must be an object.')
+    if (assessment.assessment_type === 'mcq' && !['A', 'B', 'C', 'D'].includes(correctAnswer ?? '')) return badRequest('MCQ questions require a correct answer of A, B, C, or D.')
+
+    const { data: question } = await db.from('ca1_assessment_questions').select('id').eq('id', questionId).eq('assessment_id', assessmentId).single()
+    if (!question) return badRequest('Question does not belong to this assessment.')
+
+    const updates = {
+      question_text: questionText,
+      options,
+      correct_answer: correctAnswer,
+      explanation: body.explanation == null ? null : String(body.explanation),
+      model_answer: body.model_answer == null ? null : String(body.model_answer),
+      co: body.co == null ? null : String(body.co),
+    }
+    const { data, error } = await db.from('ca1_assessment_questions').update(updates).eq('id', questionId).eq('assessment_id', assessmentId).select().single()
+    if (error) throw error
+    await audit(`staff:${staff.email}`, 'assessment_question_updated', `assessment:${assessmentId}:question:${questionId}`)
+    return ok({ question: data })
+  } catch (error) {
+    if (error instanceof Error && error.message === 'UNAUTHORIZED') return unauthorized()
+    return serverError(error instanceof Error ? error.message : 'Could not update question.')
+  }
+}
