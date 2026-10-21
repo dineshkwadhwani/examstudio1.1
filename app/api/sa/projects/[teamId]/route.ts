@@ -107,8 +107,12 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
       if (error instanceof Error && error.message === 'GITHUB_URL_INVALID') return badRequest('The GitHub repository URL is invalid.')
       if (error instanceof Error && error.message === 'GITHUB_REPOSITORY_NOT_FOUND') return badRequest('The GitHub repository could not be found or is not accessible.')
       if (error instanceof Error && error.message === 'GROQ_API_KEY is not configured.') return serverError('Groq evaluation is not configured on the server.')
-      if (error instanceof Error && /^GROQ_API_ERROR_\d+$/.test(error.message)) return serverError(`Groq evaluation failed (${error.message.replace('GROQ_API_ERROR_', 'HTTP ')}).`)
+      if (error instanceof Error && /^GROQ_API_ERROR_\d+/.test(error.message)) {
+        const [status, ...details] = error.message.replace('GROQ_API_ERROR_', '').split(': ')
+        return serverError(`Groq evaluation failed (HTTP ${status})${details.length ? `: ${details.join(': ')}` : '.'}`)
+      }
       if (error instanceof Error && ['GROQ_INVALID_JSON', 'GROQ_INVALID_SCORE'].includes(error.message)) return serverError(`Groq returned an invalid evaluation response (${error.message.replace('GROQ_', '').toLowerCase().replace('_', ' ')}). Please try again.`)
+      if (error instanceof Error && error.message.startsWith('AI_SCORE_SAVE_FAILED_')) return serverError(`Groq returned a response, but the suggested score could not be saved (database error ${error.message.replace('AI_SCORE_SAVE_FAILED_', '')}). Apply migration 027_ca3_ai_evaluation_feedback.sql, then try again.`)
       if (error instanceof Error && error.message.includes('submitted PDF')) return serverError(error.message)
       console.error('CA3 AI evaluation error:', error)
       return serverError('Automated evaluation failed. Check the submitted documents and try again.')

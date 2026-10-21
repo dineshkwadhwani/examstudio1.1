@@ -116,9 +116,14 @@ async function groqJson(system: string, user: string): Promise<EvaluationResult>
       ],
     }),
   })
-  if (!response.ok) throw new Error(`GROQ_API_ERROR_${response.status}`)
+  if (!response.ok) {
+    const errorBody = (await response.text()).replace(/\s+/g, ' ').trim().slice(0, 300)
+    console.error('CA3 Groq request failed:', { model: GROQ_MODEL, status: response.status, body: errorBody })
+    throw new Error(`GROQ_API_ERROR_${response.status}${errorBody ? `: ${errorBody}` : ''}`)
+  }
   const payload = await response.json() as { choices?: Array<{ message?: { content?: string } }> }
   const content = payload.choices?.[0]?.message?.content ?? ''
+  console.info('CA3 Groq response received:', { model: GROQ_MODEL, status: response.status, contentLength: content.length })
   const jsonContent = content.replace(/^```(?:json)?\s*/i, '').replace(/\s*```$/i, '').trim()
   const objectStart = jsonContent.indexOf('{')
   const objectEnd = jsonContent.lastIndexOf('}')
@@ -173,6 +178,10 @@ export async function evaluateCa3Category(teamId: number, category: 'multi_agent
     system_model: GROQ_MODEL,
     updated_at: new Date().toISOString(),
   }, { onConflict: 'team_id,category' })
-  if (saveError) throw saveError
+  if (saveError) {
+    const code = typeof saveError.code === 'string' ? saveError.code : 'UNKNOWN'
+    console.error('CA3 AI response received, but saving the suggested score failed:', { teamId, category, code })
+    throw new Error(`AI_SCORE_SAVE_FAILED_${code}`)
+  }
   return { category, max_marks: rubric, ...result, score, model: GROQ_MODEL }
 }
