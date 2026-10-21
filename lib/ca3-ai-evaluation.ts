@@ -1,6 +1,15 @@
 import { PDFParse } from 'pdf-parse'
+import { createRequire } from 'node:module'
+import { pathToFileURL } from 'node:url'
 import { db } from './db'
 import type { CA3Category } from './ca3-rubric'
+
+// Next.js may bundle relative worker paths into .next/server/chunks, where
+// pdf.js cannot resolve them at runtime. Resolve the package worker directly
+// from Node instead of importing pdf-parse/worker (which pulls in native
+// @napi-rs/canvas and cannot be placed in Turbopack ESM chunks).
+const require = createRequire(import.meta.url)
+PDFParse.setWorker(pathToFileURL(require.resolve('pdfjs-dist/legacy/build/pdf.worker.mjs')).href)
 
 const configuredModel = process.env.GROQ_CA3_MODEL?.trim()
 const GROQ_MODEL = configuredModel && configuredModel !== 'llama-3.3-70b-versatile'
