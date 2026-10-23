@@ -46,7 +46,7 @@ export default function ProjectResultsPage() {
               <span className="font-semibold text-gray-900">{section.marks ?? '—'} / {section.max_marks}</span>
             </div>)}
             <div className="flex items-center justify-between p-3 text-sm">
-              <span className="text-gray-700">Individual contribution</span>
+              <span className="text-gray-700">Contribution score used for allocation</span>
               <span className="font-semibold text-gray-900">{result.individual.marks ?? '—'} / {result.individual.max_marks}</span>
             </div>
           </div>

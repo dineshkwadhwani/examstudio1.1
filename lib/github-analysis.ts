@@ -4,14 +4,18 @@ const GITHUB_API = 'https://api.github.com'
 const MAX_COMMITS_PER_MEMBER = 100
 const WEIGHTS = {
   commits: 25,
-  activeDays: 25,
+  activeDays: 10,
   changes: 10,
-  pullRequests: 15,
-  reviews: 15,
-  filesOwned: 10,
+  pullRequests: 10,
+  reviews: 10,
+  filesOwned: 25,
+  // Authoring is represented by added source lines. `changes` remains the
+  // broader additions-plus-deletions measure, so the two metrics are visible
+  // separately in the scorecard.
+  authoring: 10,
 } as const
 
-type GithubCommit = { sha: string; commit?: { author?: { date?: string } } }
+type GithubCommit = { sha: string; author?: { login?: string | null } | null; committer?: { login?: string | null } | null; commit?: { author?: { name?: string; email?: string; date?: string }; committer?: { name?: string; email?: string; date?: string } } }
 type GithubCommitDetail = { sha: string; stats?: { additions?: number; deletions?: number }; files?: Array<{ filename: string }> }
 type GithubPullRequest = { user?: { login?: string }; merged_at?: string | null }
 type GithubReview = { user?: { login?: string }; body?: string | null }
@@ -52,6 +56,11 @@ function ratio(value: number, maximum: number) {
   return maximum > 0 ? value / maximum : 0
 }
 
+function sameGithubLogin(commit: GithubCommit, username: string) {
+  const expected = username.trim().toLowerCase()
+  return [commit.author?.login, commit.committer?.login].some(login => login?.trim().toLowerCase() === expected)
+}
+
 export async function analyzeGithubTeam(teamId: number, repositoryUrl: string, members: Array<{ student_id: number; github_username: string }>) {
   const { owner, repo } = parseRepository(repositoryUrl)
   const base = `/repos/${encodeURIComponent(owner)}/${encodeURIComponent(repo)}`
@@ -59,7 +68,15 @@ export async function analyzeGithubTeam(teamId: number, repositoryUrl: string, m
 
   for (const member of members) {
     const username = member.github_username.trim()
-    const commits = await github<GithubCommit[]>(`${base}/commits?author=${encodeURIComponent(username)}&per_page=${MAX_COMMITS_PER_MEMBER}`)
+    let commits = await github<GithubCommit[]>(`${base}/commits?author=${encodeURIComponent(username)}&per_page=${MAX_COMMITS_PER_MEMBER}`)
+    // GitHub can return no results for the author filter when a commit's
+    // author metadata is linked differently from the supplied login. Scan
+    // the recent repository commits and match the API's author/committer
+    // login before concluding that the member has no activity.
+    if (commits.length === 0) {
+      const recentCommits = await github<GithubCommit[]>(`${base}/commits?per_page=${MAX_COMMITS_PER_MEMBER}`)
+      commits = recentCommits.filter(commit => sameGithubLogin(commit, username))
+    }
     const activity = { student_id: member.student_id, github_username: username, commit_count: commits.length, additions: 0, deletions: 0, active_days: new Set<string>(), first_commit_at: null as string | null, last_commit_at: null as string | null, prs_opened: 0, prs_reviewed: 0, review_comments: 0, files: new Set<string>() }
     for (const commit of commits) {
       const timestamp = commit.commit?.author?.date ?? null
@@ -106,12 +123,15 @@ export async function analyzeGithubTeam(teamId: number, repositoryUrl: string, m
       + ratio(stat.prs_opened, max('prs_opened')) * WEIGHTS.pullRequests
       + ratio(stat.prs_reviewed + stat.review_comments, max('prs_reviewed') + max('review_comments')) * WEIGHTS.reviews
       + ratio(stat.files_owned, max('files_owned')) * WEIGHTS.filesOwned
+      + ratio(stat.additions, Math.max(...stats.map(item => item.additions), 0)) * WEIGHTS.authoring
     return { ...stat, contribution_percentage: weighted, system_score: Math.round((weighted / 100 * 5) * 100) / 100 }
   })
 
   for (const stat of result) {
     await db.from('ca1_github_contribution_stats').upsert({ team_id: teamId, student_id: stat.student_id, github_username: stat.github_username, commit_count: stat.commit_count, additions: stat.additions, deletions: stat.deletions, active_days: stat.active_days.size, first_commit_at: stat.first_commit_at, last_commit_at: stat.last_commit_at, prs_opened: stat.prs_opened, prs_reviewed: stat.prs_reviewed, review_comments: stat.review_comments, files_owned: stat.files_owned, contribution_percentage: stat.contribution_percentage, computed_at: new Date().toISOString() }, { onConflict: 'team_id,student_id' })
-    await db.from('ca1_project_individual_scores').upsert({ team_id: teamId, student_id: stat.student_id, max_marks: 5, system_score: stat.system_score, updated_at: new Date().toISOString() }, { onConflict: 'team_id,student_id' })
+    // A fresh GitHub analysis replaces the previous automated contribution
+    // result. The Super Admin can then enter a final manual override.
+    await db.from('ca1_project_individual_scores').upsert({ team_id: teamId, student_id: stat.student_id, max_marks: 5, final_score: null, system_score: stat.system_score, updated_at: new Date().toISOString() }, { onConflict: 'team_id,student_id' })
   }
   return { repository: `${owner}/${repo}`, weights: WEIGHTS, members: result.map(stat => ({ ...stat, active_days: stat.active_days.size, files: undefined })) }
 }

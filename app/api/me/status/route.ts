@@ -2,6 +2,7 @@ import { db } from '@/lib/db'
 import { ok, forbidden } from '@/lib/api'
 import { getSession } from '@/lib/session'
 import { closeExpiredSessionsAndVerify } from '@/lib/session-lifecycle'
+import { getRelevantStudentSession } from '@/lib/student-session'
 
 // Session-cookie version of /api/v1/status — for the student dashboard.
 // The exam API key is never available client-side after generation,
@@ -13,13 +14,7 @@ export async function GET() {
   const studentId = session.id
 
   await closeExpiredSessionsAndVerify()
-  const { data: examSession } = await db
-    .from('ca1_exam_sessions')
-    .select('*')
-    .in('status', ['registration_open', 'running'])
-    .order('created_at', { ascending: false })
-    .limit(1)
-    .maybeSingle()
+  const examSession = await getRelevantStudentSession(studentId)
   // Deadline enforcement is timestamp-based, so students see an ended exam
   // immediately even when no background scheduler has updated the row yet.
   const examExpired = examSession?.status === 'running' && !!examSession.ends_at &&

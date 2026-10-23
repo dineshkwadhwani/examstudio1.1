@@ -17,7 +17,7 @@ export async function POST(request: NextRequest) {
     const path = await uploadArtifactPdf(team.team.id, field, file)
     return ok({ path })
   } catch (error) {
-    if (error instanceof Error && error.message === 'ARTIFACTS_LOCKED') return conflict('artifacts_locked', 'Artifacts cannot be changed after final scoring.')
+    if (error instanceof Error && error.message === 'ARTIFACTS_LOCKED') return conflict('artifacts_locked', 'Artifacts cannot be changed while they are presented or locked.')
     if (error instanceof Error && error.message === 'PDF_ONLY') return badRequest('Only PDF documents are accepted.')
     if (error instanceof Error && error.message === 'FILE_TOO_LARGE') return badRequest('PDF files must be 10 MB or smaller.')
     console.error('Artifact PDF upload error:', error)

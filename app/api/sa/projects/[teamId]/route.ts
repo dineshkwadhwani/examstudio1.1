@@ -99,7 +99,7 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
   try { staff = await requireSA() } catch { return forbidden('Super Admin access required.') }
   const teamId = teamIdFrom((await params).teamId)
   if (!teamId) return notFound('Project not found.')
-  let body: { action?: string; category?: string; overall_comments?: string; scores?: Array<{ category?: string; final_score?: number | null; evaluator_notes?: string; override_reason?: string }>; individual?: Array<{ student_id?: number; final_score?: number | null; evaluator_notes?: string; override_reason?: string }> }
+  let body: { action?: string; category?: string; overall_comments?: string; scores?: Array<{ category?: string; final_score?: number | null; evaluator_notes?: string; override_reason?: string }>; individual?: Array<{ student_id?: number; final_score?: number | null; student_total_override?: number | null; evaluator_notes?: string; override_reason?: string }> }
   try { body = await request.json() } catch { return badRequest('Invalid JSON body.') }
 
   if (body.action === 'analyze_category') {
@@ -136,13 +136,25 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
   }
 
   if (body.action === 'analyze_github') {
-    const { analyzeGithubTeam } = await import('@/lib/github-analysis')
-    const { data: artifact } = await db.from('ca1_project_artifacts').select('status, github_repo_url').eq('team_id', teamId).maybeSingle()
-    if (!artifact || artifact.status !== 'submitted') return conflict('not_submitted', 'The team must submit its artifacts before GitHub analysis.')
+    let analyzeGithubTeam: typeof import('@/lib/github-analysis').analyzeGithubTeam
+    try {
+      ({ analyzeGithubTeam } = await import('@/lib/github-analysis'))
+    } catch (error) {
+      console.error('Load GitHub analysis module error:', error)
+      return serverError('GitHub analysis is unavailable on the server.')
+    }
+    const { data: artifact, error: artifactError } = await db.from('ca1_project_artifacts').select('status, github_repo_url').eq('team_id', teamId).maybeSingle()
+    if (artifactError) return serverError('Could not load the submitted project for GitHub analysis.')
+    if (!artifact || !['submitted', 'presented'].includes(artifact.status)) return conflict('not_submitted', 'The team must submit its artifacts before GitHub analysis.')
     if (!artifact.github_repo_url) return badRequest('The team has not provided a GitHub repository URL.')
-    const { data: members } = await db.from('ca1_team_members').select('student_id, github_username').eq('team_id', teamId).is('left_at', null)
-    const analyzable = (members ?? []).filter(member => member.student_id && member.github_username?.trim()).map(member => ({ student_id: member.student_id as number, github_username: member.github_username as string }))
-    if (analyzable.length !== (members ?? []).length) return badRequest('Every registered team member must provide a GitHub username before analysis.')
+    const { data: members, error: membersError } = await db.from('ca1_team_members').select('student_id, github_username, ca1_roster(name)').eq('team_id', teamId).is('left_at', null)
+    if (membersError) return serverError('Could not load the team members for GitHub analysis.')
+    const memberName = (member: { ca1_roster?: { name?: string } | Array<{ name?: string }> | null; roster_prn?: string }) => Array.isArray(member.ca1_roster) ? member.ca1_roster[0]?.name ?? member.roster_prn ?? 'Unknown member' : member.ca1_roster?.name ?? member.roster_prn ?? 'Unknown member'
+    const unregistered = (members ?? []).filter(member => !member.student_id)
+    if (unregistered.length > 0) return badRequest(`The following active team members must register their student accounts before GitHub analysis: ${unregistered.map(memberName).join(', ')}.`)
+    const missingGithub = (members ?? []).filter(member => !member.github_username?.trim())
+    if (missingGithub.length > 0) return badRequest(`The following team members must provide a GitHub username before analysis: ${missingGithub.map(memberName).join(', ')}.`)
+    const analyzable = (members ?? []).map(member => ({ student_id: member.student_id as number, github_username: member.github_username as string }))
     try {
       const result = await analyzeGithubTeam(teamId, artifact.github_repo_url, analyzable)
       await audit(`staff:${staff.id}`, 'ca3_github_analysis_completed', `team:${teamId}`, { repository: result.repository })
@@ -156,6 +168,30 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
     }
   }
 
+  if (body.action === 'toggle_presented') {
+    const { data: artifact, error: artifactError } = await db.from('ca1_project_artifacts').select('status, submitted_at').eq('team_id', teamId).maybeSingle()
+    if (artifactError) return serverError('Could not load the project artifact status.')
+    if (!artifact) return notFound('Project artifacts not found.')
+    if (artifact.status !== 'submitted' && artifact.status !== 'presented') return conflict('invalid_artifact_status', 'Only submitted artifacts can be marked Presented or returned to Submitted.')
+    if (artifact.status === 'presented') {
+      const { error } = await db.from('ca1_project_artifacts').update({ status: 'submitted', updated_at: new Date().toISOString() }).eq('team_id', teamId)
+      if (error) return serverError('Could not return the project to Submitted.')
+      await audit(`staff:${staff.id}`, 'ca3_project_unpresented', `team:${teamId}`)
+      return ok({ status: 'submitted', message: 'Project returned to Submitted. Student artifacts can be updated again.' })
+    }
+
+    // Make the submission state explicit before applying Presented. If the
+    // second update fails, the project safely remains Submitted rather than
+    // appearing Presented without a recorded submission timestamp.
+    const submittedAt = artifact.submitted_at ?? new Date().toISOString()
+    const { error: submitError } = await db.from('ca1_project_artifacts').update({ status: 'submitted', submitted_at: submittedAt, updated_at: new Date().toISOString() }).eq('team_id', teamId)
+    if (submitError) return serverError('Could not confirm the artifact submission.')
+    const { error: presentError } = await db.from('ca1_project_artifacts').update({ status: 'presented', submitted_at: submittedAt, updated_at: new Date().toISOString() }).eq('team_id', teamId)
+    if (presentError) return serverError('Artifacts were submitted, but could not be marked Presented.')
+    await audit(`staff:${staff.id}`, 'ca3_project_presented', `team:${teamId}`, { submission_confirmed: true })
+    return ok({ status: 'presented', message: 'Artifacts submitted and project marked Presented. Student artifact updates are locked.' })
+  }
+
   if (body.action === 'publish' || body.action === 'unpublish') {
     const published = body.action === 'publish'
     const { error } = await db.from('ca1_ca3_config').update({ results_published: published, published_at: published ? new Date().toISOString() : null, published_by: published ? staff.id : null }).eq('id', true)
@@ -166,7 +202,7 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
 
   if (body.action !== 'save_scores') return badRequest('Unknown evaluation action.')
   const { data: artifact } = await db.from('ca1_project_artifacts').select('status').eq('team_id', teamId).maybeSingle()
-  if (!artifact || artifact.status !== 'submitted') return conflict('not_submitted', artifact?.status === 'locked' ? 'Final scores have already been saved for this project.' : 'The team has not submitted its project artifacts.')
+  if (!artifact || !['submitted', 'presented', 'locked'].includes(artifact.status)) return conflict('not_submitted', 'The team has not submitted its project artifacts.')
   for (const score of body.scores ?? []) {
     const category = rubricCategory(score.category ?? '')
     if (!category) return badRequest('Invalid rubric category.')
@@ -175,16 +211,18 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
     if (error) return serverError('Could not save project scores.')
   }
   for (const score of body.individual ?? []) {
-    if (!score.student_id || (score.final_score != null && (!Number.isFinite(score.final_score) || score.final_score < 0 || score.final_score > CA3_INDIVIDUAL_MAX_MARKS))) return badRequest('Invalid individual score.')
-    const { error } = await db.from('ca1_project_individual_scores').upsert({ team_id: teamId, student_id: score.student_id, max_marks: CA3_INDIVIDUAL_MAX_MARKS, final_score: score.final_score ?? null, evaluator_notes: score.evaluator_notes?.trim() || null, override_reason: score.override_reason?.trim() || null, scored_by: staff.id, scored_at: new Date().toISOString(), updated_at: new Date().toISOString() }, { onConflict: 'team_id,student_id' })
-    if (error) return serverError('Could not save individual scores.')
+    if (!score.student_id || (score.final_score != null && (!Number.isFinite(score.final_score) || score.final_score < 0 || score.final_score > CA3_INDIVIDUAL_MAX_MARKS)) || (score.student_total_override != null && (!Number.isFinite(score.student_total_override) || score.student_total_override < 0 || score.student_total_override > 45))) return badRequest('Invalid individual score or student total.')
+    const { error } = await db.from('ca1_project_individual_scores').upsert({ team_id: teamId, student_id: score.student_id, max_marks: CA3_INDIVIDUAL_MAX_MARKS, final_score: score.final_score ?? null, student_total_override: score.student_total_override ?? null, evaluator_notes: score.evaluator_notes?.trim() || null, override_reason: score.override_reason?.trim() || null, scored_by: staff.id, scored_at: new Date().toISOString(), updated_at: new Date().toISOString() }, { onConflict: 'team_id,student_id' })
+    if (error) {
+      const debugId = crypto.randomUUID()
+      console.error('Save CA3 individual score error:', { debugId, teamId, studentId: score.student_id, code: error.code, message: error.message, details: error.details, hint: error.hint })
+      return serverError(`Could not save individual scores. Database error ${error.code ?? 'unknown'}: ${error.message}. Debug ID: ${debugId}`)
+    }
   }
   if (body.overall_comments !== undefined) {
     const { error: reviewError } = await db.from('ca1_teams').update({ assessment_review_comments: body.overall_comments.trim() || null, updated_at: new Date().toISOString() }).eq('id', teamId)
     if (reviewError) return serverError('Scores were saved, but overall comments could not be saved.')
   }
-  const { error: lockError } = await db.from('ca1_project_artifacts').update({ status: 'locked', updated_at: new Date().toISOString() }).eq('team_id', teamId)
-  if (lockError) return serverError('Scores were saved, but artifacts could not be locked.')
   await audit(`staff:${staff.id}`, 'ca3_scores_saved', `team:${teamId}`)
-  return ok({ message: 'Scores saved and artifacts locked.' })
+  return ok({ message: 'Scores saved successfully. Artifact status was not changed.' })
 }

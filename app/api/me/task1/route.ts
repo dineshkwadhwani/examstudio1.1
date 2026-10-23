@@ -3,6 +3,7 @@ import { NextRequest } from 'next/server'
 import { db, audit } from '@/lib/db'
 import { ok, forbidden, err } from '@/lib/api'
 import { getSession } from '@/lib/session'
+import { getRegisteredRunningSession } from '@/lib/student-session'
 
 const VALID_COLOURS = ['Red', 'Blue', 'Green', 'Orange']
 
@@ -14,11 +15,7 @@ export async function POST(req: NextRequest) {
   const { id: studentId, prn } = session
 
   // Check exam is running
-  const { data: examSession } = await db
-    .from('ca1_exam_sessions')
-    .select('id, status, ends_at')
-    .eq('status', 'running')
-    .single()
+  const examSession = await getRegisteredRunningSession(studentId)
 
   if (!examSession) return err('exam_not_started', 'Exam not running.', 403)
   if (examSession.ends_at && new Date() > new Date(examSession.ends_at)) {

@@ -32,6 +32,8 @@ interface Ca3Stats {
 interface Session {
   id: number
   label: string
+  exam_code: string | null
+  exam_title: string | null
   status: string
   started_at: string | null
   ends_at: string | null
@@ -462,6 +464,9 @@ export default function SADashboard() {
                 <div className="flex items-start justify-between mb-3">
                   <div>
                     <p className="font-semibold text-gray-100">{s.label}</p>
+                    <p className="text-xs font-medium text-blue-300 mt-0.5">
+                      {s.exam_code ?? 'Exam'}{s.exam_title ? ` — ${s.exam_title}` : ''}
+                    </p>
                     <p className="text-xs text-gray-500 mt-0.5">ID: {s.id}</p>
                     {s.ends_at && (
                       <p className="text-xs text-gray-400 mt-0.5">

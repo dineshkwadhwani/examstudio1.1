@@ -2,12 +2,13 @@ import { answerWriteError, checkTestOpen } from '@/lib/test-submission'
 import { NextRequest } from 'next/server'
 import { db, audit } from '@/lib/db'
 import {
-  resolveApiKey, getActiveSession, isWithinWindow,
+  resolveApiKey, isWithinWindow,
   err, ok, getSourceIp
 } from '@/lib/api'
 import { getRun } from '@/lib/apify'
 import { gradeTask2 } from '@/lib/grading'
 import type { Task2Payload } from '@/lib/types'
+import { getRegisteredRunningSession } from '@/lib/student-session'
 
 export async function POST(req: NextRequest) {
   // ─── Auth ────────────────────────────────────────────────
@@ -17,7 +18,7 @@ export async function POST(req: NextRequest) {
   const { studentId, prn } = resolved
 
   // ─── Exam window ─────────────────────────────────────────
-  const session = await getActiveSession()
+  const session = await getRegisteredRunningSession(studentId)
   if (!session) return err('exam_not_started', 'The exam is not currently running.', 403)
   if (!isWithinWindow(session)) return err('exam_ended', 'The exam has ended.', 403)
 

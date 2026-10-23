@@ -1,7 +1,8 @@
 import { answerWriteError, checkTestOpen } from '@/lib/test-submission'
 import { NextRequest } from 'next/server'
 import { db, audit } from '@/lib/db'
-import { resolveApiKey, getActiveSession, isWithinWindow, err, ok } from '@/lib/api'
+import { resolveApiKey, isWithinWindow, err, ok } from '@/lib/api'
+import { getRegisteredRunningSession } from '@/lib/student-session'
 
 const VALID_COLOURS = ['Red', 'Blue', 'Green', 'Orange']
 
@@ -11,7 +12,7 @@ export async function POST(req: NextRequest) {
 
   const { studentId, prn } = resolved
 
-  const session = await getActiveSession()
+  const session = await getRegisteredRunningSession(studentId)
   if (!session) return err('exam_not_started', 'The exam is not currently running.', 403)
   if (!isWithinWindow(session)) return err('exam_ended', 'The exam has ended.', 403)
 

@@ -9,9 +9,18 @@ export interface StudentExam {
   created_at: string
   results_released_at: string | null
   ca1_exam_definitions: { code: string; title: string } | null
+  registered_at?: string
 }
 
 export async function getStudentExams(studentId: number): Promise<StudentExam[]> {
+  const { data: registrations, error: registrationError } = await db
+    .from('ca1_exam_session_registrations')
+    .select('session_id, registered_at')
+    .eq('student_id', studentId)
+    .order('registered_at', { ascending: false })
+  if (registrationError) throw new Error('Could not load your exam history.')
+
+  const registrationDates = new Map((registrations ?? []).map(row => [row.session_id, row.registered_at]))
   const participation = await Promise.all([
     'ca1_question_papers', 'ca1_mcq_assignments', 'ca1_submissions',
   ].map(async table => {
@@ -25,14 +34,17 @@ export async function getStudentExams(studentId: number): Promise<StudentExam[]>
     }
     return [...ids]
   }))
-  const ids = [...new Set(participation.flat())]
+  const ids = [...new Set([...(registrations ?? []).map(row => row.session_id), ...participation.flat()])]
   const exams: StudentExam[] = []
   for (let offset = 0; offset < ids.length; offset += 100) {
     const { data, error } = await db.from('ca1_exam_sessions')
       .select('id, label, status, started_at, ends_at, created_at, results_released_at, ca1_exam_definitions(code, title)')
       .in('id', ids.slice(offset, offset + 100))
     if (error) throw new Error('Could not load your exam history.')
-    exams.push(...(data as unknown as StudentExam[] ?? []))
+    exams.push(...((data ?? []) as unknown as StudentExam[]).map(exam => ({
+      ...exam,
+      registered_at: registrationDates.get(exam.id),
+    })))
   }
   const now = Date.now()
   for (const exam of exams) {

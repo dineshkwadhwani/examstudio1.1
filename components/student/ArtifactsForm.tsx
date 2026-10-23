@@ -13,7 +13,7 @@ type Artifact = {
   execution_trace: string | null;
   demo_video_url: string | null;
   presentation_date: string | null;
-  status: 'draft' | 'submitted' | 'locked' | null;
+  status: 'draft' | 'submitted' | 'presented' | 'locked' | null;
 };
 
 type PresentationDateOption = {
@@ -70,7 +70,7 @@ export default function ArtifactsForm({
   const [dateBusy, setDateBusy] = useState(false);
   const [submissionChecks, setSubmissionChecks] = useState<SubmissionCheck[] | null>(null);
 
-  const locked = status === 'locked';
+  const locked = status === 'locked' || status === 'presented';
   const canSubmit = useMemo(
     () => !locked && fields.every(({ name, required }) => !required || values[name].trim()),
     [locked, values],

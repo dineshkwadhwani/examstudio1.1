@@ -25,6 +25,12 @@ export async function GET() {
       if (total.error || pending.error) throw new Error('Could not load verification status.')
       return {
         ...session,
+        exam_code: Array.isArray(session.ca1_exam_definitions)
+          ? session.ca1_exam_definitions[0]?.code ?? null
+          : session.ca1_exam_definitions?.code ?? null,
+        exam_title: Array.isArray(session.ca1_exam_definitions)
+          ? session.ca1_exam_definitions[0]?.title ?? null
+          : session.ca1_exam_definitions?.title ?? null,
         verification: {
           total: total.count ?? 0,
           pending: pending.count ?? 0,

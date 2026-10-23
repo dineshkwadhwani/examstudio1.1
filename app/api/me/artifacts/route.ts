@@ -35,7 +35,7 @@ export async function POST(req: NextRequest) {
     }, `student:${ctx.session.id}`)
     return ok({ message: 'Artifacts draft saved.' })
   } catch (error) {
-    if (error instanceof Error && error.message === 'ARTIFACTS_LOCKED') return conflict('artifacts_locked', 'Artifacts cannot be changed after submission.')
+    if (error instanceof Error && error.message === 'ARTIFACTS_LOCKED') return conflict('artifacts_locked', 'Artifacts cannot be changed while they are presented or locked.')
     if (error instanceof Error && error.message === 'PROJECT_NOT_APPROVED') return forbidden('Artifacts are available only for approved projects.')
     console.error('Save artifacts error:', error)
     return serverError('Could not save the artifacts draft.')

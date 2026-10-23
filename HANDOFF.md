@@ -346,6 +346,11 @@ the Super Admin provisions access.
 Migration `024_ca1_legacy_prn_id_backfill.sql` handles the legacy Symbi Assess
 profile shape where the PRN is stored as `prn_id`.
 
+Migration `030_ca3_team_67_review_update.sql` applies the CA3 review workbook
+decision for team 67 (`CodingNinjas`): it marks the project rejected, records
+the 1/10 project strength, preserves the reviewer comments and rejection
+reason, and stores the assessment decision rationale.
+
 Super Admin assessment management is available at `/sa/ca1/assessments`, with
 results at `/sa/ca1/results`. Students access assigned and completed
 assessments at `/assessments`. The migration is additive and does not alter the

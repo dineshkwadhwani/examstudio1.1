@@ -55,6 +55,8 @@ interface RegistrationOption {
   label: string
   code: string
   title: string
+  status: string
+  registered: boolean
 }
 
 const COLOURS = ['Red', 'Blue', 'Green', 'Orange']
@@ -112,6 +114,8 @@ export default function DashboardPage() {
   const [examCount, setExamCount] = useState<number | null>(null)
   const [approvedProject, setApprovedProject] = useState<ApprovedProject | null>(null)
   const [registrationOptions, setRegistrationOptions] = useState<RegistrationOption[]>([])
+  const [registeringSession, setRegisteringSession] = useState<number | null>(null)
+  const [registrationError, setRegistrationError] = useState('')
 
   const fetchStatus = useCallback(async () => {
     const statusRes = await fetch('/api/me/status')
@@ -149,10 +153,10 @@ export default function DashboardPage() {
   }, [])
 
   const fetchRegistrationOptions = useCallback(async () => {
-    const registrationsRes = await fetch('/api/auth/registration-options')
+    const registrationsRes = await fetch('/api/me/exam-registrations')
     if (registrationsRes.ok) {
-      const data = await registrationsRes.json() as { exams?: RegistrationOption[] }
-      setRegistrationOptions(data.exams ?? [])
+      const data = await registrationsRes.json() as { open_sessions?: RegistrationOption[] }
+      setRegistrationOptions(data.open_sessions ?? [])
     }
   }, [])
 
@@ -256,6 +260,25 @@ export default function DashboardPage() {
     }
   }
 
+  async function registerForExam(sessionId: number) {
+    setRegisteringSession(sessionId)
+    setRegistrationError('')
+    try {
+      const response = await fetch('/api/me/exam-registrations', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ session_id: sessionId }),
+      })
+      const data = await response.json() as { message?: string }
+      if (!response.ok) throw new Error(data.message ?? 'Could not register for this exam.')
+      await Promise.all([fetchRegistrationOptions(), fetchExamCount(), fetchStatus()])
+    } catch (error) {
+      setRegistrationError(error instanceof Error ? error.message : 'Could not register for this exam.')
+    } finally {
+      setRegisteringSession(null)
+    }
+  }
+
   const testSubmitted = !!status?.test_submitted_at
   const examRunning = status?.exam_status === 'running' && !testSubmitted
   const hasKey = !!(keyInfo?.has_key)
@@ -310,8 +333,8 @@ export default function DashboardPage() {
 
             <section className="card">
               <h2 className="font-semibold text-gray-900">My Exams</h2>
-              <p className="mt-1 text-sm text-gray-600">Review completed answer sheets and marks.</p>
-              <p className="mt-4 text-3xl font-bold text-blue-900">{examCount ?? '—'} <span className="text-sm font-normal text-gray-500">exam{examCount === 1 ? '' : 's'} taken</span></p>
+              <p className="mt-1 text-sm text-gray-600">View all exams you have registered for, including completed answer sheets and marks.</p>
+              <p className="mt-4 text-3xl font-bold text-blue-900">{examCount ?? '—'} <span className="text-sm font-normal text-gray-500">registered exam{examCount === 1 ? '' : 's'}</span></p>
               <Link href="/my-exams" className="btn-secondary mt-4 inline-flex text-sm">View My Exams</Link>
             </section>
 
@@ -333,11 +356,12 @@ export default function DashboardPage() {
             {registrationOptions.length > 0 && (
               <section aria-labelledby="open-registrations-title" className="card border-blue-200 bg-blue-50 md:col-span-2">
                 <p className="text-xs font-semibold uppercase tracking-wide text-blue-700">Open now</p>
-                <h2 id="open-registrations-title" className="mt-1 font-semibold text-blue-950">Register for an exam</h2>
-                <p className="mt-1 text-sm text-blue-800">Choose an exam below to create a student account.</p>
+                <h2 id="open-registrations-title" className="mt-1 font-semibold text-blue-950">Exam registration is open</h2>
+                <p className="mt-1 text-sm text-blue-800">Select the exam session you want to take. This registers your existing student account for that session.</p>
+                {registrationError && <p className="mt-3 text-sm font-medium text-red-700" role="alert">{registrationError}</p>}
                 <div className="mt-4 grid gap-3 md:grid-cols-2">
                   {registrationOptions.map(exam => (
-                    <Link key={exam.session_id} href="/register" className="rounded-xl border border-blue-200 bg-white p-4 transition hover:border-blue-400 hover:shadow-md">
+                    <div key={exam.session_id} className="rounded-xl border border-blue-200 bg-white p-4">
                       <div className="flex items-start justify-between gap-3">
                         <div>
                           <p className="text-xs font-semibold uppercase tracking-wide text-blue-700">{exam.code}</p>
@@ -346,8 +370,15 @@ export default function DashboardPage() {
                         <span className="shrink-0 rounded-full bg-green-100 px-2 py-1 text-xs font-medium text-green-700">Open</span>
                       </div>
                       <p className="mt-2 text-sm text-gray-600">{exam.label}</p>
-                      <p className="mt-3 text-sm font-semibold text-blue-700">Register now →</p>
-                    </Link>
+                      <button
+                        type="button"
+                        onClick={() => registerForExam(exam.session_id)}
+                        disabled={exam.registered || registeringSession !== null}
+                        className="btn-primary mt-3 text-sm disabled:cursor-not-allowed disabled:opacity-60"
+                      >
+                        {exam.registered ? 'Registered' : registeringSession === exam.session_id ? 'Registering…' : 'Register for this exam'}
+                      </button>
+                    </div>
                   ))}
                 </div>
               </section>
@@ -359,7 +390,7 @@ export default function DashboardPage() {
                 <p className="mt-1 text-sm text-blue-800">Registration is open. Your exam will appear here when the invigilator starts it.</p>
               </section>
             )}
-            {!registrationOpen && <p className="md:col-span-2 text-center text-sm text-gray-600">No exam registration has started yet. Please check back when the invigilator opens registration.</p>}
+            {!registrationOpen && registrationOptions.length === 0 && <p className="md:col-span-2 text-center text-sm text-gray-600">No exam registration has started yet. Please check back when the invigilator opens registration.</p>}
           </div>
         </main>
       </div>

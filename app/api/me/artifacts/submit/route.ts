@@ -26,7 +26,7 @@ export async function POST(req: NextRequest) {
     if (result.errors.length > 0) return badRequest(result.errors.map(error => error.message).join(' '))
     return ok({ message: 'All required artifacts were validated and submitted successfully.', status: 'submitted', submitted_at: result.submitted_at, checks: result.checks })
   } catch (error) {
-    if (error instanceof Error && error.message === 'ARTIFACTS_LOCKED') return conflict('artifacts_locked', 'Artifacts have already been submitted.')
+    if (error instanceof Error && error.message === 'ARTIFACTS_LOCKED') return conflict('artifacts_locked', 'Artifacts cannot be changed while they are presented or locked.')
     if (error instanceof Error && error.message === 'PROJECT_NOT_APPROVED') return forbidden('Artifacts are available only for approved projects.')
     if (error instanceof Error && error.message === 'SUBMISSION_VERIFICATION_FAILED') return serverError('The submission could not be verified after saving. Please try again.')
     console.error('Submit artifacts error:', error)

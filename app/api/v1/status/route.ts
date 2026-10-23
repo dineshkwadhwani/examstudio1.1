@@ -2,6 +2,7 @@ import { NextRequest } from 'next/server'
 import { db } from '@/lib/db'
 import { resolveApiKey, ok } from '@/lib/api'
 import { closeExpiredSessionsAndVerify } from '@/lib/session-lifecycle'
+import { getRelevantStudentSession } from '@/lib/student-session'
 
 export async function GET(req: NextRequest) {
   const resolved = await resolveApiKey(req)
@@ -9,13 +10,7 @@ export async function GET(req: NextRequest) {
 
   const { studentId } = resolved
   await closeExpiredSessionsAndVerify()
-  const { data: session } = await db
-    .from('ca1_exam_sessions')
-    .select('*')
-    .in('status', ['registration_open', 'running'])
-    .order('created_at', { ascending: false })
-    .limit(1)
-    .maybeSingle()
+  const session = await getRelevantStudentSession(studentId)
   const examExpired = session?.status === 'running' && !!session.ends_at &&
     new Date(session.ends_at) <= new Date()
   const effectiveStatus = examExpired ? 'closed' : session?.status

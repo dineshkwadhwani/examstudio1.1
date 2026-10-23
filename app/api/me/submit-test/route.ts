@@ -1,14 +1,15 @@
 import { NextRequest } from 'next/server'
 import { db, audit } from '@/lib/db'
 import { getSession } from '@/lib/session'
-import { getActiveSession, isWithinWindow, ok, err, forbidden, serverError } from '@/lib/api'
+import { isWithinWindow, ok, err, forbidden, serverError } from '@/lib/api'
+import { getRegisteredRunningSession } from '@/lib/student-session'
 
 export async function POST(req: NextRequest) {
   const student = await getSession()
   if (!student || student.type !== 'student') return forbidden()
   let body: { session_id?: number }
   try { body = await req.json() } catch { return err('bad_request', 'Invalid JSON.', 400) }
-  const session = await getActiveSession()
+  const session = await getRegisteredRunningSession(student.id)
   if (!session || !isWithinWindow(session)) return err('exam_ended', 'The exam is not running.', 403)
   if (body.session_id !== session.id) return err('session_changed', 'Your exam session has changed. Refresh the page.', 409)
 

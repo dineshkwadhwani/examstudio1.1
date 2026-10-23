@@ -116,13 +116,14 @@ async function ensureEditable(teamId: number) {
   const { data: team } = await db.from('ca1_teams').select('id, status').eq('id', teamId).single()
   if (!team || team.status !== 'approved') throw new Error('PROJECT_NOT_APPROVED')
   const { data: artifacts } = await db.from('ca1_project_artifacts').select('status').eq('team_id', teamId).maybeSingle()
-  if (artifacts?.status === 'locked') throw new Error('ARTIFACTS_LOCKED')
+  if (artifacts?.status === 'locked' || artifacts?.status === 'presented') throw new Error('ARTIFACTS_LOCKED')
 }
 
 export async function upsertTeamArtifacts(teamId: number, data: ArtifactInput, actor: string) {
   await ensureEditable(teamId)
   const artifactData = Object.fromEntries(ARTIFACT_FIELDS.map(field => [field, data[field]?.trim() || null]))
   const { data: existing } = await db.from('ca1_project_artifacts').select('status').eq('team_id', teamId).maybeSingle()
+  if (existing?.status === 'locked' || existing?.status === 'presented') throw new Error('ARTIFACTS_LOCKED')
   const { error } = await db.from('ca1_project_artifacts').upsert({ team_id: teamId, ...artifactData, status: existing?.status === 'submitted' ? 'submitted' : 'draft', updated_at: new Date().toISOString() }, { onConflict: 'team_id' })
   if (error) throw error
   for (const member of data.members ?? []) {
@@ -132,7 +133,29 @@ export async function upsertTeamArtifacts(teamId: number, data: ArtifactInput, a
 }
 
 export async function submitTeamArtifacts(teamId: number, data: ArtifactInput, actor: string) {
-  const errors = artifactValidationErrors(data)
+  const { data: activeMembers, error: membersError } = await db
+    .from('ca1_team_members')
+    .select('roster_prn, github_username, ca1_roster!inner(name)')
+    .eq('team_id', teamId)
+    .is('left_at', null)
+    .order('joined_at')
+  if (membersError) throw membersError
+  const submittedGithubByPrn = new Map((data.members ?? []).map(member => [member.prn, member.github_username.trim()]))
+  const missingGithubMembers = (activeMembers ?? []).filter(member => {
+    const githubUsername = submittedGithubByPrn.has(member.roster_prn)
+      ? submittedGithubByPrn.get(member.roster_prn)
+      : member.github_username?.trim()
+    return !githubUsername
+  })
+  if (missingGithubMembers.length > 0) {
+    const names = missingGithubMembers.map(member => member.ca1_roster[0]?.name ?? member.roster_prn)
+    return { errors: [{ field: 'members.github_username', message: `GitHub username is required for: ${names.join(', ')}.` }] }
+  }
+  const normalizedMembers = (activeMembers ?? []).map(member => ({
+    prn: member.roster_prn,
+    github_username: submittedGithubByPrn.has(member.roster_prn) ? submittedGithubByPrn.get(member.roster_prn) ?? '' : member.github_username?.trim() ?? '',
+  }))
+  const errors = artifactValidationErrors({ ...data, members: normalizedMembers })
   if (errors.length > 0) return { errors }
   await ensureEditable(teamId)
   const artifactData = Object.fromEntries(ARTIFACT_FIELDS.map(field => [field, data[field]?.trim() || null]))

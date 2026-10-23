@@ -6,7 +6,7 @@ import { useParams, useRouter } from 'next/navigation'
 
 type Member = { roster_prn: string; ca1_roster: { name: string } }
 type SearchStudent = { prn: string; name: string; registered: boolean; reserved: boolean; reserved_by_this_team: boolean }
-type Artifact = { id: string; status: 'draft' | 'submitted' | 'locked'; synopsis_pdf_path: string | null; design_document_pdf_path: string | null; input_definition: string | null; output_definition: string | null; github_repo_url: string | null; project_url: string | null; execution_trace: string | null; demo_video_url: string | null; submitted_at: string | null; updated_at: string }
+type Artifact = { id: string; status: 'draft' | 'submitted' | 'presented' | 'locked'; synopsis_pdf_path: string | null; design_document_pdf_path: string | null; input_definition: string | null; output_definition: string | null; github_repo_url: string | null; project_url: string | null; execution_trace: string | null; demo_video_url: string | null; submitted_at: string | null; updated_at: string }
 type Team = { id: number; name: string; project_name: string | null; project_description: string | null; project_strength: number | null; review_comments: string | null; assessment_review_comments: string | null; status: string; rejection_reason: string | null; members: Member[]; artifacts: Artifact | null }
 
 export default function SATeamDetailPage() {

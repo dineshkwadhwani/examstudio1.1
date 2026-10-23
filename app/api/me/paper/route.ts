@@ -2,6 +2,7 @@ import { checkTestOpen } from '@/lib/test-submission'
 import { db } from '@/lib/db'
 import { ok, forbidden, err, serverError } from '@/lib/api'
 import { getSession } from '@/lib/session'
+import { getRegisteredRunningSession } from '@/lib/student-session'
 import { makeSeed, pickWord, pickPage, buildRenderedPaper, pickMagicCode } from '@/lib/paper'
 import type { SheetRow, ReferenceTable } from '@/lib/types'
 
@@ -16,11 +17,7 @@ export async function GET() {
   const { id: studentId, prn, name } = session
 
   // Get active exam session
-  const { data: examSession } = await db
-    .from('ca1_exam_sessions')
-    .select('*')
-    .eq('status', 'running')
-    .single()
+  const examSession = await getRegisteredRunningSession(studentId)
 
   if (!examSession) return err('exam_not_started', 'The exam is not currently running.', 403)
 

@@ -2,11 +2,12 @@ import { checkTestOpen } from '@/lib/test-submission'
 import { NextRequest } from 'next/server'
 import { db, audit } from '@/lib/db'
 import {
-  resolveApiKey, getActiveSession, isWithinWindow,
+  resolveApiKey, isWithinWindow,
   err, ok, serverError
 } from '@/lib/api'
 import { makeSeed, pickWord, pickPage, buildRenderedPaper, pickMagicCode } from '@/lib/paper'
 import type { SheetRow, ReferenceTable } from '@/lib/types'
+import { getRegisteredRunningSession } from '@/lib/student-session'
 
 
 const APP_URL = process.env.NEXT_PUBLIC_APP_URL ?? 'https://examstudioca2.thecoachdinesh.com'
@@ -34,7 +35,7 @@ export async function GET(req: NextRequest) {
     return err('rate_limited', 'Too many requests. Wait a moment and try again.', 429)
   }
 
-  const session = await getActiveSession()
+  const session = await getRegisteredRunningSession(studentId)
   if (!session) return err('exam_not_started', 'The exam is not currently running.', 403)
   if (!isWithinWindow(session)) return err('exam_ended', 'The exam has ended.', 403)
 
