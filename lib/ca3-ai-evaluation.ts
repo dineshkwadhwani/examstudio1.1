@@ -1,16 +1,93 @@
-import { PDFParse } from 'pdf-parse'
 import { join } from 'node:path'
 import { pathToFileURL } from 'node:url'
 import { db } from './db'
 import type { CA3Category } from './ca3-rubric'
 
-// Next.js may bundle relative worker paths into .next/server/chunks, where
-// pdf.js cannot resolve them at runtime. Read the standalone Node worker from
-// the deployed filesystem and provide it as a file URL. This avoids importing
-// pdf-parse/worker (which pulls in native @napi-rs/canvas) and avoids Turbopack
-// rewriting package resolution into a virtual module path.
+// pdfjs-dist initializes a few browser/canvas globals while its module is
+// loading. Text extraction does not need a canvas, but the server bundle may
+// not have @napi-rs/canvas available to provide DOMMatrix. Install the small
+// affine-transform subset pdf.js needs before dynamically importing pdf-parse.
+type MatrixLike = { a: number; b: number; c: number; d: number; e: number; f: number }
+
+class ServerDOMMatrix implements MatrixLike {
+  a = 1
+  b = 0
+  c = 0
+  d = 1
+  e = 0
+  f = 0
+
+  constructor(value?: number[] | MatrixLike) {
+    if (Array.isArray(value)) {
+      this.a = value[0] ?? 1
+      this.b = value[1] ?? 0
+      this.c = value[2] ?? 0
+      this.d = value[3] ?? 1
+      this.e = value[4] ?? 0
+      this.f = value[5] ?? 0
+    } else if (value) {
+      Object.assign(this, value)
+    }
+  }
+
+  translate(x: number, y = 0) {
+    this.e += this.a * x + this.c * y
+    this.f += this.b * x + this.d * y
+    return this
+  }
+
+  scale(x: number, y = x) {
+    this.a *= x
+    this.b *= x
+    this.c *= y
+    this.d *= y
+    return this
+  }
+
+  multiplySelf(other: MatrixLike) {
+    const { a, b, c, d, e, f } = this
+    this.a = a * other.a + c * other.b
+    this.b = b * other.a + d * other.b
+    this.c = a * other.c + c * other.d
+    this.d = b * other.c + d * other.d
+    this.e = a * other.e + c * other.f + e
+    this.f = b * other.e + d * other.f + f
+    return this
+  }
+
+  preMultiplySelf(other: MatrixLike) {
+    const current = new ServerDOMMatrix(this)
+    Object.assign(this, new ServerDOMMatrix(other).multiplySelf(current))
+    return this
+  }
+
+  invertSelf() {
+    const determinant = this.a * this.d - this.b * this.c
+    if (determinant === 0) throw new Error('Cannot invert a singular DOMMatrix.')
+    const { a, b, c, d, e, f } = this
+    this.a = d / determinant
+    this.b = -b / determinant
+    this.c = -c / determinant
+    this.d = a / determinant
+    this.e = (c * f - d * e) / determinant
+    this.f = (b * e - a * f) / determinant
+    return this
+  }
+}
+
+const serverGlobals = globalThis as typeof globalThis & { DOMMatrix?: unknown }
+if (!serverGlobals.DOMMatrix) (serverGlobals as { DOMMatrix?: unknown }).DOMMatrix = ServerDOMMatrix
+
 const pdfWorkerPath = join(process.cwd(), 'node_modules/pdfjs-dist/legacy/build/pdf.worker.mjs')
-PDFParse.setWorker(pathToFileURL(pdfWorkerPath).href)
+let pdfParserPromise: Promise<typeof import('pdf-parse')> | null = null
+
+async function getPdfParser() {
+  pdfParserPromise ??= import('pdf-parse').then(parser => {
+    parser.PDFParse.setWorker(pathToFileURL(pdfWorkerPath).href)
+    return parser
+  })
+  return pdfParserPromise
+}
 
 const configuredModel = process.env.GROQ_CA3_MODEL?.trim()
 const GROQ_MODEL = configuredModel && configuredModel !== 'llama-3.3-70b-versatile'
@@ -65,6 +142,7 @@ async function extractPdf(path: string | null, limit: number) {
   if (!path) return '[not submitted]'
   const { data, error } = await db.storage.from('ca3-artifacts').download(path)
   if (error || !data) throw new Ca3EvaluationError('pdf_download', 'Could not download a submitted PDF for evaluation.')
+  const { PDFParse } = await getPdfParser()
   const parser = new PDFParse({ data: new Uint8Array(await data.arrayBuffer()) })
   try {
     const result = await parser.getText()

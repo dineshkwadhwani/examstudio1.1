@@ -7,9 +7,14 @@ type Project = {
   name: string
   project_name: string | null
   ca1_project_artifacts: { status: string }[] | { status: string } | null
+  ca1_project_scores?: Array<{ category: string; system_score: number | null; system_evaluated_at: string | null }>
+  ca1_project_individual_scores?: Array<{ student_id: number; system_score: number | null }>
+  ca1_team_members?: Array<{ student_id: number | null; left_at: string | null }>
+  ca1_github_contribution_stats?: Array<{ student_id: number; computed_at: string | null }>
 }
 
 type BatchKind = 'github' | 'multi_agent_design' | 'design' | 'documentation'
+type StatusFilter = 'both' | 'submitted' | 'presented'
 
 const GROQ_DELAY_MS = 90_000
 
@@ -34,6 +39,15 @@ function isRateLimit(payload: Record<string, unknown>, response: Response) {
   return response.status === 429 || message.includes('429') || message.includes('rate limit') || payload.code === 'github_rate_limit'
 }
 
+function hasBeenEvaluated(project: Project, kind: BatchKind) {
+  if (kind === 'github') {
+    const memberIds = (project.ca1_team_members ?? []).filter(member => member.left_at === null && member.student_id !== null).map(member => member.student_id as number)
+    const analyzedIds = new Set((project.ca1_github_contribution_stats ?? []).map(stat => stat.student_id))
+    return memberIds.length > 0 && memberIds.every(studentId => analyzedIds.has(studentId))
+  }
+  return (project.ca1_project_scores ?? []).some(score => score.category === kind && (score.system_evaluated_at !== null || score.system_score !== null))
+}
+
 export default function CA3Evaluate() {
   const [projects, setProjects] = useState<Project[]>([])
   const [loading, setLoading] = useState(true)
@@ -42,6 +56,12 @@ export default function CA3Evaluate() {
   const [message, setMessage] = useState('')
   const [error, setError] = useState('')
   const [logs, setLogs] = useState<string[]>([])
+  const [filters, setFilters] = useState<Record<BatchKind, { status: StatusFilter; reevaluate: boolean }>>({
+    github: { status: 'both', reevaluate: false },
+    multi_agent_design: { status: 'both', reevaluate: false },
+    design: { status: 'both', reevaluate: false },
+    documentation: { status: 'both', reevaluate: false },
+  })
 
   function appendLog(entry: string) {
     setLogs(current => [...current, `[${new Date().toLocaleTimeString()}] ${entry}`])
@@ -80,19 +100,31 @@ export default function CA3Evaluate() {
 
   async function runBatch(kind: BatchKind) {
     if (running) return
+    const filter = filters[kind]
     setRunning(kind)
     setMessage('')
     setError('')
     setLogs([])
     appendLog(`${jobs.find(job => job.kind === kind)?.label} started.`)
-    const eligible = projects.filter(project => ['submitted', 'presented'].includes(statusFor(project)))
+    const eligible = projects.filter(project => {
+      const status = statusFor(project)
+      const statusMatches = filter.status === 'both' ? ['submitted', 'presented'].includes(status) : status === filter.status
+      return statusMatches && (filter.reevaluate || !hasBeenEvaluated(project, kind))
+    })
+    const statusEligible = projects.filter(project => {
+      const status = statusFor(project)
+      return filter.status === 'both' ? ['submitted', 'presented'].includes(status) : status === filter.status
+    })
     if (eligible.length === 0) {
-      setMessage('No submitted or presented teams are available for this evaluation.')
-      appendLog('No submitted or presented teams were found. Nothing to process.')
+      const message = statusEligible.length === 0
+        ? 'No teams match the selected artifact status.'
+        : 'All teams matching the selected artifact status have already been evaluated. Enable Re Evaluate to run them again.'
+      setMessage(message)
+      appendLog(message)
       setRunning(null)
       return
     }
-    appendLog(`${eligible.length} submitted/presented team(s) queued.`)
+    appendLog(`${eligible.length} team(s) queued; ${statusEligible.length - eligible.length} already evaluated and skipped.`)
 
     let completed = 0
     let failed = 0
@@ -152,8 +184,9 @@ export default function CA3Evaluate() {
     }
 
     const stopped = stoppedEarly || consecutiveFailures >= 3
-    setMessage(`${jobs.find(job => job.kind === kind)?.label} finished: ${completed} completed, ${failed} failed${stopped ? '; stopped after three consecutive failures' : ''}.`)
-    appendLog(`Complete: ${completed} completed, ${failed} failed${stopped ? '; stopped after three consecutive failures' : ''}.`)
+    const skipped = statusEligible.length - eligible.length
+    setMessage(`${jobs.find(job => job.kind === kind)?.label} finished: ${completed} completed, ${failed} failed, ${skipped} skipped${stopped ? '; stopped after three consecutive failures' : ''}.`)
+    appendLog(`Complete: ${completed} completed, ${failed} failed, ${skipped} skipped${stopped ? '; stopped after three consecutive failures' : ''}.`)
     if (failures.length > 0) setError(failures.slice(0, 3).join(' | '))
     setProgress('')
     setRunning(null)
@@ -172,6 +205,19 @@ export default function CA3Evaluate() {
       {jobs.map(job => <div key={job.kind} className="rounded-lg border border-gray-700 bg-gray-900/40 p-4">
         <h3 className="font-semibold">{job.label}</h3>
         <p className="mt-1 min-h-10 text-sm text-gray-400">{job.description}</p>
+        <fieldset className="mt-4">
+          <legend className="text-xs font-semibold uppercase tracking-wide text-gray-400">Evaluate artifact status</legend>
+          <div className="mt-2 flex flex-wrap gap-3 text-sm text-gray-300">
+            {(['both', 'submitted', 'presented'] as const).map(status => <label key={status} className="flex items-center gap-1.5">
+              <input type="radio" name={`${job.kind}-status`} checked={filters[job.kind].status === status} onChange={() => setFilters(current => ({ ...current, [job.kind]: { ...current[job.kind], status } }))} disabled={loading || running !== null} />
+              {status === 'both' ? 'Both' : status.charAt(0).toUpperCase() + status.slice(1)}
+            </label>)}
+          </div>
+        </fieldset>
+        <label className="mt-3 flex items-center gap-2 text-sm text-gray-300">
+          <input type="checkbox" checked={filters[job.kind].reevaluate} onChange={event => setFilters(current => ({ ...current, [job.kind]: { ...current[job.kind], reevaluate: event.target.checked } }))} disabled={loading || running !== null} />
+          Re Evaluate
+        </label>
         <button type="button" onClick={() => void runBatch(job.kind)} disabled={loading || running !== null} className="mt-4 rounded-lg bg-indigo-700 px-3 py-2 text-sm font-medium hover:bg-indigo-600 disabled:cursor-not-allowed disabled:opacity-50">
           {running === job.kind ? 'Running…' : 'Run for all teams'}
         </button>
