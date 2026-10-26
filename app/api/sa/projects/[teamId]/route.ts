@@ -99,7 +99,7 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
   try { staff = await requireSA() } catch { return forbidden('Super Admin access required.') }
   const teamId = teamIdFrom((await params).teamId)
   if (!teamId) return notFound('Project not found.')
-  let body: { action?: string; category?: string; overall_comments?: string; scores?: Array<{ category?: string; final_score?: number | null; evaluator_notes?: string; override_reason?: string }>; individual?: Array<{ student_id?: number; final_score?: number | null; student_total_override?: number | null; evaluator_notes?: string; override_reason?: string }> }
+  let body: { action?: string; category?: string; overall_comments?: string; complete_evaluation?: boolean; scores?: Array<{ category?: string; final_score?: number | null; evaluator_notes?: string; override_reason?: string }>; individual?: Array<{ student_id?: number; final_score?: number | null; student_total_override?: number | null; evaluator_notes?: string; override_reason?: string }> }
   try { body = await request.json() } catch { return badRequest('Invalid JSON body.') }
 
   if (body.action === 'analyze_category') {
@@ -223,6 +223,13 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
     const { error: reviewError } = await db.from('ca1_teams').update({ assessment_review_comments: body.overall_comments.trim() || null, updated_at: new Date().toISOString() }).eq('id', teamId)
     if (reviewError) return serverError('Scores were saved, but overall comments could not be saved.')
   }
+  if (body.complete_evaluation) {
+    const evaluatedAt = new Date().toISOString()
+    const { error: evaluationError } = await db.from('ca1_project_artifacts').update({ evaluation_status: 'evaluated', evaluated_at: evaluatedAt, evaluated_by: staff.id, updated_at: evaluatedAt }).eq('team_id', teamId)
+    if (evaluationError) return serverError('Scores were saved, but the evaluation could not be marked complete.')
+    await audit(`staff:${staff.id}`, 'ca3_evaluation_completed', `team:${teamId}`, { evaluated_at: evaluatedAt })
+    return ok({ message: 'Scores saved and evaluation marked Evaluated.' })
+  }
   await audit(`staff:${staff.id}`, 'ca3_scores_saved', `team:${teamId}`)
-  return ok({ message: 'Scores saved successfully. Artifact status was not changed.' })
+  return ok({ message: 'Scores saved successfully. Evaluation remains pending.' })
 }

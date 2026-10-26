@@ -2,6 +2,7 @@
 import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
+import * as XLSX from 'xlsx'
 
 interface Student {
   id: number
@@ -41,6 +42,7 @@ export default function SAStudentsPage() {
   const [students, setStudents] = useState<Student[]>([])
   const [loading, setLoading] = useState(true)
   const [search, setSearch] = useState('')
+  const [batchFilter, setBatchFilter] = useState('all')
   const [showAddStudent, setShowAddStudent] = useState(false)
   const [newStudent, setNewStudent] = useState({ prn: '', name: '' })
   const [addingStudent, setAddingStudent] = useState(false)
@@ -68,6 +70,14 @@ export default function SAStudentsPage() {
     setSearch(e.target.value)
     fetchStudents(e.target.value)
   }
+
+  const batchOptions = [...new Set(students.map(student => student.session_label).filter((label): label is string => Boolean(label)))].sort()
+  const hasStudentsWithoutSession = students.some(student => !student.session_label)
+  const displayedStudents = students.filter(student => {
+    if (batchFilter === 'all') return true
+    if (batchFilter === '__none__') return !student.session_label
+    return student.session_label === batchFilter
+  })
 
   async function addRosterStudent() {
     setAddingStudent(true)
@@ -97,10 +107,36 @@ export default function SAStudentsPage() {
 
   function toggleAllStudents() {
     setSelectedIds(previous =>
-      previous.size === students.length
+      displayedStudents.length > 0 && displayedStudents.every(student => previous.has(student.id))
         ? new Set()
-        : new Set(students.map(student => student.id))
+        : new Set([...previous, ...displayedStudents.map(student => student.id)])
     )
+  }
+
+  function exportStudents() {
+    const rows = displayedStudents.map(student => ({
+      PRN: student.prn,
+      Name: student.name,
+      Email: student.email,
+      Batch: student.session_label ?? 'No exam session',
+      'Session status': student.session_status ?? '',
+      Key: student.has_key ? 'Yes' : 'No',
+      'MCQ answered': `${student.mcq_answered}/10`,
+      'Paper fetched': student.paper_fetched ? 'Yes' : 'No',
+      'T1 status': student.task1_status ?? 'Not submitted',
+      'T1 marks': student.task1_marks ?? '',
+      'T2 status': student.task2_status ?? 'Not submitted',
+      'T2 marks': student.task2_marks ?? '',
+      'T3 status': student.task3_status ?? 'Not submitted',
+      'T3 marks': student.task3_marks ?? '',
+      Total: `${student.total_marks.toFixed(1)}/15`,
+    }))
+    const worksheet = XLSX.utils.json_to_sheet(rows)
+    const workbook = XLSX.utils.book_new()
+    XLSX.utils.book_append_sheet(workbook, worksheet, 'Students')
+    const suffix = batchFilter === 'all' ? 'all-batches' : batchFilter === '__none__' ? 'no-session' : batchFilter
+    const filename = `ca2-students-${suffix.toLowerCase().replace(/[^a-z0-9]+/g, '-')}.xlsx`
+    XLSX.writeFile(workbook, filename)
   }
 
   async function deleteSelectedStudents() {
@@ -138,7 +174,7 @@ export default function SAStudentsPage() {
     <div className="min-h-screen bg-gray-900 text-white">
       <header className="bg-gray-800 border-b border-gray-700 sticky top-0 z-10">
         <div className="max-w-7xl mx-auto px-4 py-3 flex items-center justify-between">
-          <h1 className="font-bold">Students ({students.length})</h1>
+          <h1 className="font-bold">Students ({displayedStudents.length})</h1>
           <div className="flex items-center gap-3">
             {selectedIds.size > 0 && (
               <button onClick={deleteSelectedStudents} disabled={deleting} className="rounded-lg bg-red-600 px-3 py-2 text-xs font-medium text-white hover:bg-red-500 disabled:opacity-50">
@@ -154,6 +190,23 @@ export default function SAStudentsPage() {
               value={search}
               onChange={handleSearch}
             />
+            <select
+              className="input bg-gray-700 border-gray-600 text-white text-sm w-52"
+              aria-label="Filter students by batch"
+              value={batchFilter}
+              onChange={event => setBatchFilter(event.target.value)}
+            >
+              <option value="all">All batches</option>
+              {batchOptions.map(batch => <option key={batch} value={batch}>{batch}</option>)}
+              {hasStudentsWithoutSession && <option value="__none__">No exam session</option>}
+            </select>
+            <button
+              onClick={exportStudents}
+              disabled={displayedStudents.length === 0}
+              className="btn-secondary text-xs disabled:opacity-50"
+            >
+              Export to Excel
+            </button>
             <Link href="/sa/dashboard" className="btn-secondary text-xs">← Dashboard</Link>
           </div>
         </div>
@@ -189,7 +242,7 @@ export default function SAStudentsPage() {
                   <input
                     type="checkbox"
                     aria-label="Select all students shown"
-                    checked={students.length > 0 && selectedIds.size === students.length}
+                    checked={displayedStudents.length > 0 && displayedStudents.every(student => selectedIds.has(student.id))}
                     onChange={toggleAllStudents}
                     className="h-4 w-4 accent-red-600"
                   />
@@ -208,7 +261,7 @@ export default function SAStudentsPage() {
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-800">
-              {students.map(s => (
+              {displayedStudents.map(s => (
                 <tr key={`${s.id}-${s.session_id ?? 'none'}`} className="hover:bg-gray-800 transition-colors">
                   <td className="py-2.5 pr-3">
                     <input
