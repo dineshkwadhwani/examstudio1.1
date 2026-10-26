@@ -25,6 +25,8 @@ interface Ca3Stats {
   pending_approval: number
   rejected_teams: number
   submitted_artifacts: number
+  presented_artifacts: number
+  evaluation_complete_artifacts: number
   locked_artifacts: number
   results_published: boolean
 }
@@ -392,6 +394,8 @@ export default function SADashboard() {
               { label: 'Approved teams', value: ca3Stats?.approved_teams ?? 0, color: 'text-green-400' },
               { label: 'Pending approval', value: ca3Stats?.pending_approval ?? 0, color: 'text-yellow-400' },
               { label: 'Submitted artifacts', value: ca3Stats?.submitted_artifacts ?? 0, color: 'text-purple-400' },
+              { label: 'Presented artifacts', value: ca3Stats?.presented_artifacts ?? 0, color: 'text-blue-300' },
+              { label: 'Evaluation Complete', value: ca3Stats?.evaluation_complete_artifacts ?? 0, color: 'text-blue-800' },
               { label: 'Locked artifacts', value: ca3Stats?.locked_artifacts ?? 0, color: 'text-orange-400' },
               { label: 'Rejected teams', value: ca3Stats?.rejected_teams ?? 0, color: 'text-red-400' },
             ].map(tile => (

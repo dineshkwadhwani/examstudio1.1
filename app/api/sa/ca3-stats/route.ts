@@ -19,6 +19,8 @@ export async function GET() {
     pending_approval: teams?.filter(team => team.status === 'pending_approval').length ?? 0,
     rejected_teams: teams?.filter(team => team.status === 'rejected').length ?? 0,
     submitted_artifacts: artifacts?.filter(artifact => artifact.status === 'submitted').length ?? 0,
+    presented_artifacts: artifacts?.filter(artifact => artifact.status === 'presented').length ?? 0,
+    evaluation_complete_artifacts: artifacts?.filter(artifact => artifact.status === 'evaluation_complete').length ?? 0,
     locked_artifacts: artifacts?.filter(artifact => artifact.status === 'locked').length ?? 0,
     results_published: config?.results_published ?? false,
   })
