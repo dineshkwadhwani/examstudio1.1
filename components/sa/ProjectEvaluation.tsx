@@ -110,10 +110,23 @@ export default function ProjectEvaluation({ teamId }: { teamId: string }) {
   async function saveScores(completeEvaluation = false) {
     if (!data) return
     setBusy(true); setMessage(''); setError('')
-    const response = await fetch(`/api/sa/projects/${teamId}`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action: 'save_scores', complete_evaluation: completeEvaluation, overall_comments: overallComments, scores: data.rubric.map(rubric => ({ category: rubric.category, final_score: scores[rubric.category] === '' ? null : Number(scores[rubric.category]), evaluator_notes: notes[`${rubric.category}:notes`] ?? '' })), individual: data.members.filter(member => member.student_id).map(member => ({ student_id: member.student_id, final_score: individual[String(member.student_id)] === '' ? null : Number(individual[String(member.student_id)]), student_total_override: memberTotals[String(member.student_id)] === '' ? null : Number(memberTotals[String(member.student_id)]) })) }) })
-    const payload = await response.json().catch(() => ({})); setBusy(false)
-    if (!response.ok) { setError(payload.message ?? 'Could not save scores.'); return }
-    setMessage(payload.message ?? (completeEvaluation ? 'Scores saved and evaluation marked Evaluated.' : 'Scores saved successfully.')); await load()
+    try {
+      const response = await fetch(`/api/sa/projects/${teamId}`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action: 'save_scores', complete_evaluation: completeEvaluation, overall_comments: overallComments, scores: data.rubric.map(rubric => ({ category: rubric.category, final_score: scores[rubric.category] === '' ? null : Number(scores[rubric.category]), evaluator_notes: notes[`${rubric.category}:notes`] ?? '' })), individual: data.members.filter(member => member.student_id).map(member => ({ student_id: member.student_id, final_score: individual[String(member.student_id)] === '' ? null : Number(individual[String(member.student_id)]), student_total_override: memberTotals[String(member.student_id)] === '' ? null : Number(memberTotals[String(member.student_id)]) })) }) })
+      const payload = await response.json().catch(() => ({}))
+      if (!response.ok) {
+        setError(payload.message ?? `Could not save scores (HTTP ${response.status}).`)
+        window.scrollTo({ top: 0, behavior: 'smooth' })
+        return
+      }
+      setMessage(payload.message ?? (completeEvaluation ? 'Scores saved and evaluation marked Evaluated.' : 'Scores saved successfully.'))
+      window.scrollTo({ top: 0, behavior: 'smooth' })
+      await load()
+    } catch (caught) {
+      setError(caught instanceof Error ? `Could not save scores: ${caught.message}` : 'Could not save scores. Please try again.')
+      window.scrollTo({ top: 0, behavior: 'smooth' })
+    } finally {
+      setBusy(false)
+    }
   }
 
   async function togglePresented() {

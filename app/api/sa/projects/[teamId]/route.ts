@@ -226,8 +226,13 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
   }
   if (body.complete_evaluation) {
     const evaluatedAt = new Date().toISOString()
-    const { error: evaluationError } = await db.from('ca1_project_artifacts').update({ status: 'evaluation_complete', evaluation_status: 'evaluated', evaluated_at: evaluatedAt, evaluated_by: staff.id, updated_at: evaluatedAt }).eq('team_id', teamId).eq('status', 'presented')
-    if (evaluationError) return serverError('Scores were saved, but the evaluation could not be marked complete.')
+    const { data: completedArtifact, error: evaluationError } = await db.from('ca1_project_artifacts').update({ status: 'evaluation_complete', evaluation_status: 'evaluated', evaluated_at: evaluatedAt, evaluated_by: staff.id, updated_at: evaluatedAt }).eq('team_id', teamId).eq('status', 'presented').select('id, status').maybeSingle()
+    if (evaluationError) {
+      const debugId = crypto.randomUUID()
+      console.error('Complete CA3 evaluation error:', { debugId, teamId, code: evaluationError.code, message: evaluationError.message, details: evaluationError.details, hint: evaluationError.hint })
+      return serverError(`Scores were saved, but the evaluation could not be marked complete${databaseErrorCode(evaluationError)}. Debug ID: ${debugId}`)
+    }
+    if (!completedArtifact) return conflict('invalid_evaluation_transition', 'Evaluation Complete could not be applied because the project is no longer Presented.')
     await audit(`staff:${staff.id}`, 'ca3_evaluation_completed', `team:${teamId}`, { evaluated_at: evaluatedAt })
     return ok({ message: 'Scores saved and evaluation marked Evaluated.' })
   }
