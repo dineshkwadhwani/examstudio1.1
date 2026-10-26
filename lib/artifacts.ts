@@ -116,14 +116,14 @@ async function ensureEditable(teamId: number) {
   const { data: team } = await db.from('ca1_teams').select('id, status').eq('id', teamId).single()
   if (!team || team.status !== 'approved') throw new Error('PROJECT_NOT_APPROVED')
   const { data: artifacts } = await db.from('ca1_project_artifacts').select('status').eq('team_id', teamId).maybeSingle()
-  if (artifacts?.status === 'locked' || artifacts?.status === 'presented') throw new Error('ARTIFACTS_LOCKED')
+  if (artifacts?.status === 'locked' || artifacts?.status === 'presented' || artifacts?.status === 'evaluation_complete') throw new Error('ARTIFACTS_LOCKED')
 }
 
 export async function upsertTeamArtifacts(teamId: number, data: ArtifactInput, actor: string) {
   await ensureEditable(teamId)
   const artifactData = Object.fromEntries(ARTIFACT_FIELDS.map(field => [field, data[field]?.trim() || null]))
   const { data: existing } = await db.from('ca1_project_artifacts').select('status').eq('team_id', teamId).maybeSingle()
-  if (existing?.status === 'locked' || existing?.status === 'presented') throw new Error('ARTIFACTS_LOCKED')
+  if (existing?.status === 'locked' || existing?.status === 'presented' || existing?.status === 'evaluation_complete') throw new Error('ARTIFACTS_LOCKED')
   const { error } = await db.from('ca1_project_artifacts').upsert({ team_id: teamId, ...artifactData, status: existing?.status === 'submitted' ? 'submitted' : 'draft', updated_at: new Date().toISOString() }, { onConflict: 'team_id' })
   if (error) throw error
   for (const member of data.members ?? []) {

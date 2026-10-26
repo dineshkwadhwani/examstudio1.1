@@ -203,6 +203,7 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
   if (body.action !== 'save_scores') return badRequest('Unknown evaluation action.')
   const { data: artifact } = await db.from('ca1_project_artifacts').select('status').eq('team_id', teamId).maybeSingle()
   if (!artifact || !['submitted', 'presented', 'locked'].includes(artifact.status)) return conflict('not_submitted', 'The team has not submitted its project artifacts.')
+  if (body.complete_evaluation && artifact.status !== 'presented') return conflict('invalid_evaluation_transition', 'Evaluation Complete is available only after the project is marked Presented.')
   for (const score of body.scores ?? []) {
     const category = rubricCategory(score.category ?? '')
     if (!category) return badRequest('Invalid rubric category.')
@@ -225,7 +226,7 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
   }
   if (body.complete_evaluation) {
     const evaluatedAt = new Date().toISOString()
-    const { error: evaluationError } = await db.from('ca1_project_artifacts').update({ evaluation_status: 'evaluated', evaluated_at: evaluatedAt, evaluated_by: staff.id, updated_at: evaluatedAt }).eq('team_id', teamId)
+    const { error: evaluationError } = await db.from('ca1_project_artifacts').update({ status: 'evaluation_complete', evaluation_status: 'evaluated', evaluated_at: evaluatedAt, evaluated_by: staff.id, updated_at: evaluatedAt }).eq('team_id', teamId).eq('status', 'presented')
     if (evaluationError) return serverError('Scores were saved, but the evaluation could not be marked complete.')
     await audit(`staff:${staff.id}`, 'ca3_evaluation_completed', `team:${teamId}`, { evaluated_at: evaluatedAt })
     return ok({ message: 'Scores saved and evaluation marked Evaluated.' })
