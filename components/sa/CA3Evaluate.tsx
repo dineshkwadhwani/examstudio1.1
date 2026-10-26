@@ -13,7 +13,7 @@ type Project = {
   ca1_github_contribution_stats?: Array<{ student_id: number; computed_at: string | null }>
 }
 
-type BatchKind = 'github' | 'multi_agent_design' | 'design' | 'documentation'
+type BatchKind = 'github' | 'multi_agent_design' | 'design' | 'documentation' | 'code_review'
 type StatusFilter = 'both' | 'submitted' | 'presented'
 
 const GROQ_DELAY_MS = 90_000
@@ -23,6 +23,7 @@ const jobs: Array<{ kind: BatchKind; label: string; description: string }> = [
   { kind: 'multi_agent_design', label: 'Complete Multi-Agent Architecture & Agentic Design', description: 'Run the Groq evaluation for every submitted or presented team.' },
   { kind: 'design', label: 'Complete Design evaluations', description: 'Run the Groq evaluation for every submitted or presented team.' },
   { kind: 'documentation', label: 'Complete Documentation evaluations', description: 'Run the Groq evaluation for every submitted or presented team.' },
+  { kind: 'code_review', label: 'Complete Code Review & Engineering Practice evaluations', description: 'Run the Groq evaluation for every submitted or presented team.' },
 ]
 
 function sleep(milliseconds: number) {
@@ -61,6 +62,7 @@ export default function CA3Evaluate() {
     multi_agent_design: { status: 'both', reevaluate: false },
     design: { status: 'both', reevaluate: false },
     documentation: { status: 'both', reevaluate: false },
+    code_review: { status: 'both', reevaluate: false },
   })
 
   function appendLog(entry: string) {
