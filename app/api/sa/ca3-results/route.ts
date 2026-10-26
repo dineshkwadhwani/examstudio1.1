@@ -8,19 +8,21 @@ const categories = ['multi_agent_design', 'design', 'live_demo', 'presentation',
 export async function GET() {
   try { await requireSA() } catch { return forbidden('Super Admin access required.') }
 
-  const [studentsResult, membersResult, teamsResult, scoresResult, individualResult] = await Promise.all([
+  const [studentsResult, membersResult, teamsResult, artifactsResult, scoresResult, individualResult] = await Promise.all([
     db.from('ca1_students').select('id, name, prn'),
     db.from('ca1_team_members').select('student_id, team_id, roster_prn').is('left_at', null),
     db.from('ca1_teams').select('id, name, status'),
+    db.from('ca1_project_artifacts').select('team_id, status'),
     db.from('ca1_project_scores').select('team_id, category, final_score'),
     db.from('ca1_project_individual_scores').select('team_id, student_id, final_score, student_total_override'),
   ])
 
-  if (studentsResult.error || membersResult.error || teamsResult.error || scoresResult.error || individualResult.error) {
+  if (studentsResult.error || membersResult.error || teamsResult.error || artifactsResult.error || scoresResult.error || individualResult.error) {
     return serverError('Could not load CA3 results.')
   }
 
   const teams = new Map((teamsResult.data ?? []).map(team => [team.id, team]))
+  const projectStatusByTeam = new Map((artifactsResult.data ?? []).map(artifact => [artifact.team_id, artifact.status]))
   const teamByStudent = new Map<number, number>()
   for (const member of membersResult.data ?? []) {
     if (member.student_id !== null) teamByStudent.set(member.student_id, member.team_id)
@@ -51,7 +53,7 @@ export async function GET() {
     const areaScores = Object.fromEntries(categories.map(category => [category, teamId === undefined ? null : calculateMemberCategoryMarks(category, teamScores.get(category) ?? 0, contribution, highestContribution)]))
     const projectTotal = Object.values(areaScores).reduce<number>((total, score) => total + (score ?? 0), 0)
     const finalScore = individual?.total_override ?? (teamId === undefined || individual === undefined ? null : projectTotal + (contribution ?? 0))
-    return { student_id: student.id, student_name: student.name, prn: student.prn, team_id: teamId ?? null, team_name: team?.name ?? null, team_status: team?.status ?? null, scores: areaScores, contribution, final_score: finalScore }
+    return { student_id: student.id, student_name: student.name, prn: student.prn, team_id: teamId ?? null, team_name: team?.name ?? null, project_status: teamId === undefined ? null : projectStatusByTeam.get(teamId) ?? null, scores: areaScores, contribution, final_score: finalScore }
   })
 
   rows.sort((a, b) => a.student_name.localeCompare(b.student_name, undefined, { sensitivity: 'base' }) || a.prn.localeCompare(b.prn))
