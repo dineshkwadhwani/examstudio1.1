@@ -171,20 +171,22 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
   if (body.action === 'toggle_presented') {
     const { data: artifact, error: artifactError } = await db.from('ca1_project_artifacts').select('status, submitted_at').eq('team_id', teamId).maybeSingle()
     if (artifactError) return serverError('Could not load the project artifact status.')
-    if (!artifact) return notFound('Project artifacts not found.')
-    if (artifact.status !== 'submitted' && artifact.status !== 'presented') return conflict('invalid_artifact_status', 'Only submitted artifacts can be marked Presented or returned to Submitted.')
-    if (artifact.status === 'presented') {
+    const artifactStatus = artifact?.status ?? null
+    if (artifactStatus === 'presented') {
       const { error } = await db.from('ca1_project_artifacts').update({ status: 'submitted', updated_at: new Date().toISOString() }).eq('team_id', teamId)
       if (error) return serverError('Could not return the project to Submitted.')
       await audit(`staff:${staff.id}`, 'ca3_project_unpresented', `team:${teamId}`)
       return ok({ status: 'submitted', message: 'Project returned to Submitted. Student artifacts can be updated again.' })
     }
+    if (artifactStatus === 'evaluation_complete' || artifactStatus === 'locked') return conflict('invalid_artifact_status', 'This project is already finalised and cannot be returned to Presented.')
 
     // Make the submission state explicit before applying Presented. If the
     // second update fails, the project safely remains Submitted rather than
     // appearing Presented without a recorded submission timestamp.
-    const submittedAt = artifact.submitted_at ?? new Date().toISOString()
-    const { error: submitError } = await db.from('ca1_project_artifacts').update({ status: 'submitted', submitted_at: submittedAt, updated_at: new Date().toISOString() }).eq('team_id', teamId)
+    const submittedAt = artifact?.submitted_at ?? new Date().toISOString()
+    const submitError = artifactStatus === null
+      ? (await db.from('ca1_project_artifacts').insert({ team_id: teamId, status: 'submitted', submitted_at: submittedAt, updated_at: new Date().toISOString() })).error
+      : (await db.from('ca1_project_artifacts').update({ status: 'submitted', submitted_at: submittedAt, updated_at: new Date().toISOString() }).eq('team_id', teamId)).error
     if (submitError) return serverError('Could not confirm the artifact submission.')
     const { error: presentError } = await db.from('ca1_project_artifacts').update({ status: 'presented', submitted_at: submittedAt, updated_at: new Date().toISOString() }).eq('team_id', teamId)
     if (presentError) return serverError('Artifacts were submitted, but could not be marked Presented.')
@@ -202,8 +204,8 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
 
   if (body.action !== 'save_scores') return badRequest('Unknown evaluation action.')
   const { data: artifact } = await db.from('ca1_project_artifacts').select('status').eq('team_id', teamId).maybeSingle()
-  if (!artifact || !['submitted', 'presented', 'locked'].includes(artifact.status)) return conflict('not_submitted', 'The team has not submitted its project artifacts.')
-  if (body.complete_evaluation && artifact.status !== 'presented') return conflict('invalid_evaluation_transition', 'Evaluation Complete is available only after the project is marked Presented.')
+  if (!artifact || !['submitted', 'presented', 'evaluation_complete', 'locked'].includes(artifact.status)) return conflict('not_submitted', 'The team has not submitted its project artifacts.')
+  if (body.complete_evaluation && !['presented', 'evaluation_complete'].includes(artifact.status)) return conflict('invalid_evaluation_transition', 'Evaluation Complete is available only after the project is marked Presented.')
   for (const score of body.scores ?? []) {
     const category = rubricCategory(score.category ?? '')
     if (!category) return badRequest('Invalid rubric category.')
@@ -226,7 +228,7 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
   }
   if (body.complete_evaluation) {
     const evaluatedAt = new Date().toISOString()
-    const { data: completedArtifact, error: evaluationError } = await db.from('ca1_project_artifacts').update({ status: 'evaluation_complete', evaluation_status: 'evaluated', evaluated_at: evaluatedAt, evaluated_by: staff.id, updated_at: evaluatedAt }).eq('team_id', teamId).eq('status', 'presented').select('id, status').maybeSingle()
+    const { data: completedArtifact, error: evaluationError } = await db.from('ca1_project_artifacts').update({ status: 'evaluation_complete', evaluation_status: 'evaluated', evaluated_at: evaluatedAt, evaluated_by: staff.id, updated_at: evaluatedAt }).eq('team_id', teamId).in('status', ['presented', 'evaluation_complete']).select('id, status').maybeSingle()
     if (evaluationError) {
       const debugId = crypto.randomUUID()
       console.error('Complete CA3 evaluation error:', { debugId, teamId, code: evaluationError.code, message: evaluationError.message, details: evaluationError.details, hint: evaluationError.hint })
