@@ -4,6 +4,7 @@ import { requireSA } from '@/lib/session'
 import { calculateMemberCategoryMarks } from '@/lib/ca3-scoring'
 
 const categories = ['multi_agent_design', 'design', 'live_demo', 'presentation', 'documentation', 'code_review'] as const
+const projectStatuses = ['draft', 'submitted', 'presented', 'evaluation_complete'] as const
 
 export async function GET() {
   try { await requireSA() } catch { return forbidden('Super Admin access required.') }
@@ -23,6 +24,12 @@ export async function GET() {
 
   const teams = new Map((teamsResult.data ?? []).map(team => [team.id, team]))
   const projectStatusByTeam = new Map((artifactsResult.data ?? []).map(artifact => [artifact.team_id, artifact.status]))
+  const statusCounts = Object.fromEntries(projectStatuses.map(status => [status, 0])) as Record<typeof projectStatuses[number], number>
+  for (const artifact of artifactsResult.data ?? []) {
+    if (projectStatuses.includes(artifact.status as typeof projectStatuses[number])) {
+      statusCounts[artifact.status as typeof projectStatuses[number]] += 1
+    }
+  }
   const teamByStudent = new Map<number, number>()
   for (const member of membersResult.data ?? []) {
     if (member.student_id !== null) teamByStudent.set(member.student_id, member.team_id)
@@ -57,5 +64,5 @@ export async function GET() {
   })
 
   rows.sort((a, b) => a.student_name.localeCompare(b.student_name, undefined, { sensitivity: 'base' }) || a.prn.localeCompare(b.prn))
-  return ok({ categories, rows })
+  return ok({ categories, rows, status_counts: statusCounts })
 }

@@ -145,16 +145,16 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
     }
     const { data: artifact, error: artifactError } = await db.from('ca1_project_artifacts').select('status, github_repo_url').eq('team_id', teamId).maybeSingle()
     if (artifactError) return serverError('Could not load the submitted project for GitHub analysis.')
-    if (!artifact || !['submitted', 'presented'].includes(artifact.status)) return conflict('not_submitted', 'The team must submit its artifacts before GitHub analysis.')
+    if (!artifact || !['submitted', 'presented', 'evaluation_complete'].includes(artifact.status)) return conflict('not_submitted', 'The team must submit its artifacts before GitHub analysis.')
     if (!artifact.github_repo_url) return badRequest('The team has not provided a GitHub repository URL.')
-    const { data: members, error: membersError } = await db.from('ca1_team_members').select('student_id, github_username, ca1_roster(name)').eq('team_id', teamId).is('left_at', null)
+    const { data: members, error: membersError } = await db.from('ca1_team_members').select('student_id, github_username, roster_prn, ca1_roster(name)').eq('team_id', teamId).is('left_at', null)
     if (membersError) return serverError('Could not load the team members for GitHub analysis.')
     const memberName = (member: { ca1_roster?: { name?: string } | Array<{ name?: string }> | null; roster_prn?: string }) => Array.isArray(member.ca1_roster) ? member.ca1_roster[0]?.name ?? member.roster_prn ?? 'Unknown member' : member.ca1_roster?.name ?? member.roster_prn ?? 'Unknown member'
     const unregistered = (members ?? []).filter(member => !member.student_id)
     if (unregistered.length > 0) return badRequest(`The following active team members must register their student accounts before GitHub analysis: ${unregistered.map(memberName).join(', ')}.`)
     const missingGithub = (members ?? []).filter(member => !member.github_username?.trim())
     if (missingGithub.length > 0) return badRequest(`The following team members must provide a GitHub username before analysis: ${missingGithub.map(memberName).join(', ')}.`)
-    const analyzable = (members ?? []).map(member => ({ student_id: member.student_id as number, github_username: member.github_username as string }))
+    const analyzable = (members ?? []).map(member => ({ student_id: member.student_id as number, github_username: member.github_username as string, name: memberName(member) }))
     try {
       const result = await analyzeGithubTeam(teamId, artifact.github_repo_url, analyzable)
       await audit(`staff:${staff.id}`, 'ca3_github_analysis_completed', `team:${teamId}`, { repository: result.repository })

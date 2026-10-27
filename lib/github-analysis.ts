@@ -56,12 +56,26 @@ function ratio(value: number, maximum: number) {
   return maximum > 0 ? value / maximum : 0
 }
 
-function sameGithubLogin(commit: GithubCommit, username: string) {
-  const expected = username.trim().toLowerCase()
-  return [commit.author?.login, commit.committer?.login].some(login => login?.trim().toLowerCase() === expected)
+function normalizeIdentity(value: string | null | undefined) {
+  return (value ?? '').trim().toLowerCase().replace(/[^a-z0-9]+/g, '')
 }
 
-export async function analyzeGithubTeam(teamId: number, repositoryUrl: string, members: Array<{ student_id: number; github_username: string }>) {
+function sameGithubIdentity(commit: GithubCommit, username: string, memberName?: string) {
+  const expected = username.trim().toLowerCase()
+  if ([commit.author?.login, commit.committer?.login].some(login => login?.trim().toLowerCase() === expected)) return true
+
+  // GitHub leaves the API-level author/committer null when the commit email
+  // is not linked to a GitHub account. In that case the nested Git metadata
+  // still contains the author's name. Use the registered roster name as a
+  // fallback so valid contributions are not lost solely because the student
+  // configured Git with an unlinked email address.
+  const expectedName = normalizeIdentity(memberName)
+  if (!expectedName) return false
+  return [commit.commit?.author?.name, commit.commit?.committer?.name]
+    .some(name => normalizeIdentity(name) === expectedName)
+}
+
+export async function analyzeGithubTeam(teamId: number, repositoryUrl: string, members: Array<{ student_id: number; github_username: string; name?: string }>) {
   const { owner, repo } = parseRepository(repositoryUrl)
   const base = `/repos/${encodeURIComponent(owner)}/${encodeURIComponent(repo)}`
   const perMember = new Map<string, MemberActivity>()
@@ -75,7 +89,7 @@ export async function analyzeGithubTeam(teamId: number, repositoryUrl: string, m
     // login before concluding that the member has no activity.
     if (commits.length === 0) {
       const recentCommits = await github<GithubCommit[]>(`${base}/commits?per_page=${MAX_COMMITS_PER_MEMBER}`)
-      commits = recentCommits.filter(commit => sameGithubLogin(commit, username))
+      commits = recentCommits.filter(commit => sameGithubIdentity(commit, username, member.name))
     }
     const activity = { student_id: member.student_id, github_username: username, commit_count: commits.length, additions: 0, deletions: 0, active_days: new Set<string>(), first_commit_at: null as string | null, last_commit_at: null as string | null, prs_opened: 0, prs_reviewed: 0, review_comments: 0, files: new Set<string>() }
     for (const commit of commits) {
@@ -128,10 +142,13 @@ export async function analyzeGithubTeam(teamId: number, repositoryUrl: string, m
   })
 
   for (const stat of result) {
-    await db.from('ca1_github_contribution_stats').upsert({ team_id: teamId, student_id: stat.student_id, github_username: stat.github_username, commit_count: stat.commit_count, additions: stat.additions, deletions: stat.deletions, active_days: stat.active_days.size, first_commit_at: stat.first_commit_at, last_commit_at: stat.last_commit_at, prs_opened: stat.prs_opened, prs_reviewed: stat.prs_reviewed, review_comments: stat.review_comments, files_owned: stat.files_owned, contribution_percentage: stat.contribution_percentage, computed_at: new Date().toISOString() }, { onConflict: 'team_id,student_id' })
-    // A fresh GitHub analysis replaces the previous automated contribution
-    // result. The Super Admin can then enter a final manual override.
-    await db.from('ca1_project_individual_scores').upsert({ team_id: teamId, student_id: stat.student_id, max_marks: 5, final_score: null, system_score: stat.system_score, updated_at: new Date().toISOString() }, { onConflict: 'team_id,student_id' })
+    const { error: statsError } = await db.from('ca1_github_contribution_stats').upsert({ team_id: teamId, student_id: stat.student_id, github_username: stat.github_username, commit_count: stat.commit_count, additions: stat.additions, deletions: stat.deletions, active_days: stat.active_days.size, first_commit_at: stat.first_commit_at, last_commit_at: stat.last_commit_at, prs_opened: stat.prs_opened, prs_reviewed: stat.prs_reviewed, review_comments: stat.review_comments, files_owned: stat.files_owned, contribution_percentage: stat.contribution_percentage, computed_at: new Date().toISOString() }, { onConflict: 'team_id,student_id' })
+    if (statsError) throw new Error(`GITHUB_STATS_SAVE_FAILED_${statsError.code ?? 'UNKNOWN'}`)
+
+    // Do not clear final_score here: it may be a deliberate Super Admin
+    // override. Omitting it from the upsert preserves the existing value.
+    const { error: scoreError } = await db.from('ca1_project_individual_scores').upsert({ team_id: teamId, student_id: stat.student_id, max_marks: 5, system_score: stat.system_score, updated_at: new Date().toISOString() }, { onConflict: 'team_id,student_id' })
+    if (scoreError) throw new Error(`GITHUB_SCORE_SAVE_FAILED_${scoreError.code ?? 'UNKNOWN'}`)
   }
   return { repository: `${owner}/${repo}`, weights: WEIGHTS, members: result.map(stat => ({ ...stat, active_days: stat.active_days.size, files: undefined })) }
 }
