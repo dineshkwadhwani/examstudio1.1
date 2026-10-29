@@ -1,4 +1,5 @@
 import { db } from './db'
+import { requestGroq } from './groq'
 import type { Ca1Assessment, Ca1AssessmentPaper, AssessmentType } from './types'
 
 type QuestionRow = {
@@ -139,8 +140,6 @@ export async function createPaperForStudent(
 }
 
 export async function evaluateSubjectivePaper(paperId: number) {
-  const apiKey = process.env.GROQ_API_KEY
-  if (!apiKey) throw new Error('GROQ_API_KEY is not configured.')
   const { data: rows, error } = await db.from('ca1_assessment_paper_questions')
     .select('id, answer_text, ca1_assessment_questions(question_text, model_answer, max_marks)')
     .eq('paper_id', paperId)
@@ -153,10 +152,7 @@ export async function evaluateSubjectivePaper(paperId: number) {
     if (!question) continue
     await db.from('ca1_assessment_paper_questions').update({ evaluation_status: 'processing' }).eq('id', row.id)
     try {
-      const response = await fetch('https://api.groq.com/openai/v1/chat/completions', {
-        method: 'POST',
-        headers: { Authorization: `Bearer ${apiKey}`, 'Content-Type': 'application/json' },
-        body: JSON.stringify({
+      const response = await requestGroq({
           model: 'llama-3.3-70b-versatile',
           temperature: 0,
           response_format: { type: 'json_object' },
@@ -164,9 +160,7 @@ export async function evaluateSubjectivePaper(paperId: number) {
             { role: 'system', content: 'Evaluate the student answer against the model answer. Return only JSON: {"marks_awarded": number, "feedback": string}. Marks must be between 0 and max_marks.' },
             { role: 'user', content: JSON.stringify({ question: question.question_text, model_answer: question.model_answer, student_answer: row.answer_text ?? '', max_marks: question.max_marks }) },
           ],
-        }),
       })
-      if (!response.ok) throw new Error(`AI evaluation failed with status ${response.status}.`)
       const payload = await response.json() as { choices?: Array<{ message?: { content?: string } }> }
       const result = JSON.parse(payload.choices?.[0]?.message?.content ?? '{}') as { marks_awarded?: number; feedback?: string }
       const maxMarks = Number(question.max_marks ?? 0)

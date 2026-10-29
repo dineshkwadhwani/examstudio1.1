@@ -16,6 +16,7 @@ const WEIGHTS = {
 } as const
 
 type GithubCommit = { sha: string; author?: { login?: string | null } | null; committer?: { login?: string | null } | null; commit?: { author?: { name?: string; email?: string; date?: string }; committer?: { name?: string; email?: string; date?: string } } }
+type GithubBranch = { name: string }
 type GithubCommitDetail = { sha: string; stats?: { additions?: number; deletions?: number }; files?: Array<{ filename: string }> }
 type GithubPullRequest = { user?: { login?: string }; merged_at?: string | null }
 type GithubReview = { user?: { login?: string }; body?: string | null }
@@ -49,7 +50,8 @@ function parseRepository(value: string) {
   if (url.hostname.toLowerCase() !== 'github.com') throw new Error('GITHUB_URL_INVALID')
   const parts = url.pathname.split('/').filter(Boolean)
   if (parts.length < 2) throw new Error('GITHUB_URL_INVALID')
-  return { owner: parts[0], repo: parts[1].replace(/\.git$/, '') }
+  const branch = parts[2]?.toLowerCase() === 'tree' && parts.length >= 4 ? parts.slice(3).join('/') : undefined
+  return { owner: parts[0], repo: parts[1].replace(/\.git$/, ''), branch }
 }
 
 function ratio(value: number, maximum: number) {
@@ -76,21 +78,30 @@ function sameGithubIdentity(commit: GithubCommit, username: string, memberName?:
 }
 
 export async function analyzeGithubTeam(teamId: number, repositoryUrl: string, members: Array<{ student_id: number; github_username: string; name?: string }>) {
-  const { owner, repo } = parseRepository(repositoryUrl)
+  const { owner, repo, branch } = parseRepository(repositoryUrl)
   const base = `/repos/${encodeURIComponent(owner)}/${encodeURIComponent(repo)}`
   const perMember = new Map<string, MemberActivity>()
 
+  // Analyse the union of the default branch and every visible repository
+  // branch. A submitted /tree/<branch> URL is a useful hint, but it must not
+  // hide commits that are already on main or on another associated branch.
+  const repository = await github<{ default_branch?: string }>(base)
+  const branches = await github<GithubBranch[]>(`${base}/branches?per_page=100`)
+  const branchNames = [...new Set([
+    repository.default_branch,
+    branch,
+    ...(branches ?? []).map(item => item.name),
+  ].filter((name): name is string => Boolean(name)))]
+  const commitsBySha = new Map<string, GithubCommit>()
+  for (const branchName of branchNames) {
+    const branchCommits = await github<GithubCommit[]>(`${base}/commits?sha=${encodeURIComponent(branchName)}&per_page=${MAX_COMMITS_PER_MEMBER}`)
+    for (const commit of branchCommits) commitsBySha.set(commit.sha, commit)
+  }
+  const repositoryCommits = [...commitsBySha.values()]
+
   for (const member of members) {
     const username = member.github_username.trim()
-    let commits = await github<GithubCommit[]>(`${base}/commits?author=${encodeURIComponent(username)}&per_page=${MAX_COMMITS_PER_MEMBER}`)
-    // GitHub can return no results for the author filter when a commit's
-    // author metadata is linked differently from the supplied login. Scan
-    // the recent repository commits and match the API's author/committer
-    // login before concluding that the member has no activity.
-    if (commits.length === 0) {
-      const recentCommits = await github<GithubCommit[]>(`${base}/commits?per_page=${MAX_COMMITS_PER_MEMBER}`)
-      commits = recentCommits.filter(commit => sameGithubIdentity(commit, username, member.name))
-    }
+    const commits = repositoryCommits.filter(commit => sameGithubIdentity(commit, username, member.name))
     const activity = { student_id: member.student_id, github_username: username, commit_count: commits.length, additions: 0, deletions: 0, active_days: new Set<string>(), first_commit_at: null as string | null, last_commit_at: null as string | null, prs_opened: 0, prs_reviewed: 0, review_comments: 0, files: new Set<string>() }
     for (const commit of commits) {
       const timestamp = commit.commit?.author?.date ?? null

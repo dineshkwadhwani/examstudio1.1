@@ -2,6 +2,7 @@ import { join } from 'node:path'
 import { pathToFileURL } from 'node:url'
 import { db } from './db'
 import type { CA3Category } from './ca3-rubric'
+import { requestGroq, GroqRequestError } from './groq'
 
 // pdfjs-dist initializes a few browser/canvas globals while its module is
 // loading. Text extraction does not need a canvas, but the server bundle may
@@ -200,12 +201,9 @@ async function repositorySnapshot(repositoryUrl: string) {
 }
 
 async function groqJson(system: string, user: string): Promise<EvaluationResult> {
-  const apiKey = process.env.GROQ_API_KEY
-  if (!apiKey) throw new Ca3EvaluationError('groq_configuration', 'GROQ_API_KEY is not configured.')
-  const response = await fetch('https://api.groq.com/openai/v1/chat/completions', {
-    method: 'POST',
-    headers: { Authorization: `Bearer ${apiKey}`, 'Content-Type': 'application/json' },
-    body: JSON.stringify({
+  let response: Response
+  try {
+    response = await requestGroq({
       model: GROQ_MODEL,
       temperature: 0,
       max_tokens: 900,
@@ -214,12 +212,13 @@ async function groqJson(system: string, user: string): Promise<EvaluationResult>
         { role: 'system', content: system },
         { role: 'user', content: user },
       ],
-    }),
-  })
-  if (!response.ok) {
-    const errorBody = (await response.text()).replace(/\s+/g, ' ').trim().slice(0, 300)
-    console.error('CA3 Groq request failed:', { model: GROQ_MODEL, status: response.status, body: errorBody })
-    throw new Ca3EvaluationError('groq_request', `GROQ_API_ERROR_${response.status}${errorBody ? `: ${errorBody}` : ''}`)
+    })
+  } catch (error) {
+    if (error instanceof GroqRequestError) {
+      console.error('CA3 Groq request failed:', { model: GROQ_MODEL, status: error.status, body: error.body })
+      throw new Ca3EvaluationError('groq_request', `GROQ_API_ERROR_${error.status}${error.body ? `: ${error.body}` : ''}`)
+    }
+    throw error
   }
   const payload = await response.json() as { choices?: Array<{ message?: { content?: string } }> }
   const content = payload.choices?.[0]?.message?.content ?? ''
@@ -246,7 +245,7 @@ async function groqJson(system: string, user: string): Promise<EvaluationResult>
 export async function evaluateCa3Category(teamId: number, category: 'multi_agent_design' | 'design' | 'documentation' | 'code_review') {
   const { data: artifact, error } = await db.from('ca1_project_artifacts').select('*').eq('team_id', teamId).maybeSingle()
   if (error) throw new Ca3EvaluationError('artifact_load', 'Could not load the submitted artifact record.', { cause: error })
-  if (!artifact || !['submitted', 'presented'].includes(artifact.status)) throw new Error('NOT_SUBMITTED')
+  if (!artifact || !['submitted', 'presented', 'evaluation_complete'].includes(artifact.status)) throw new Error('NOT_SUBMITTED')
   const row = artifact as ArtifactRow
   const documentLimits = category === 'multi_agent_design'
     ? { synopsis: 3_000, design: 9_000, input: 1_500, output: 1_500, trace: 5_000 }

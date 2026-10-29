@@ -14,16 +14,16 @@ type Project = {
 }
 
 type BatchKind = 'github' | 'multi_agent_design' | 'design' | 'documentation' | 'code_review'
-type StatusFilter = 'both' | 'submitted' | 'presented'
+type StatusFilter = 'all' | 'submitted' | 'presented' | 'evaluation_complete'
 
-const GROQ_DELAY_MS = 90_000
+const GROQ_DELAY_MS = 60_000
 
 const jobs: Array<{ kind: BatchKind; label: string; description: string }> = [
-  { kind: 'github', label: 'Complete GitHub analysis', description: 'Analyze every submitted or presented team and populate individual contribution scores.' },
-  { kind: 'multi_agent_design', label: 'Complete Multi-Agent Architecture & Agentic Design', description: 'Run the Groq evaluation for every submitted or presented team.' },
-  { kind: 'design', label: 'Complete Design evaluations', description: 'Run the Groq evaluation for every submitted or presented team.' },
-  { kind: 'documentation', label: 'Complete Documentation evaluations', description: 'Run the Groq evaluation for every submitted or presented team.' },
-  { kind: 'code_review', label: 'Complete Code Review & Engineering Practice evaluations', description: 'Run the Groq evaluation for every submitted or presented team.' },
+  { kind: 'github', label: 'Complete GitHub analysis', description: 'Analyze every Submitted, Presented, or Evaluation Complete team and populate individual contribution scores.' },
+  { kind: 'multi_agent_design', label: 'Complete Multi-Agent Architecture & Agentic Design', description: 'Run the Groq evaluation for every Submitted, Presented, or Evaluation Complete team.' },
+  { kind: 'design', label: 'Complete Design evaluations', description: 'Run the Groq evaluation for every Submitted, Presented, or Evaluation Complete team.' },
+  { kind: 'documentation', label: 'Complete Documentation evaluations', description: 'Run the Groq evaluation for every Submitted, Presented, or Evaluation Complete team.' },
+  { kind: 'code_review', label: 'Complete Code Review & Engineering Practice evaluations', description: 'Run the Groq evaluation for every Submitted, Presented, or Evaluation Complete team.' },
 ]
 
 function sleep(milliseconds: number) {
@@ -58,11 +58,11 @@ export default function CA3Evaluate() {
   const [error, setError] = useState('')
   const [logs, setLogs] = useState<string[]>([])
   const [filters, setFilters] = useState<Record<BatchKind, { status: StatusFilter; reevaluate: boolean }>>({
-    github: { status: 'both', reevaluate: false },
-    multi_agent_design: { status: 'both', reevaluate: false },
-    design: { status: 'both', reevaluate: false },
-    documentation: { status: 'both', reevaluate: false },
-    code_review: { status: 'both', reevaluate: false },
+    github: { status: 'all', reevaluate: false },
+    multi_agent_design: { status: 'all', reevaluate: false },
+    design: { status: 'all', reevaluate: false },
+    documentation: { status: 'all', reevaluate: false },
+    code_review: { status: 'all', reevaluate: false },
   })
 
   function appendLog(entry: string) {
@@ -110,12 +110,12 @@ export default function CA3Evaluate() {
     appendLog(`${jobs.find(job => job.kind === kind)?.label} started.`)
     const eligible = projects.filter(project => {
       const status = statusFor(project)
-      const statusMatches = filter.status === 'both' ? ['submitted', 'presented'].includes(status) : status === filter.status
+      const statusMatches = filter.status === 'all' ? ['submitted', 'presented', 'evaluation_complete'].includes(status) : status === filter.status
       return statusMatches && (filter.reevaluate || !hasBeenEvaluated(project, kind))
     })
     const statusEligible = projects.filter(project => {
       const status = statusFor(project)
-      return filter.status === 'both' ? ['submitted', 'presented'].includes(status) : status === filter.status
+      return filter.status === 'all' ? ['submitted', 'presented', 'evaluation_complete'].includes(status) : status === filter.status
     })
     if (eligible.length === 0) {
       const message = statusEligible.length === 0
@@ -163,7 +163,7 @@ export default function CA3Evaluate() {
               appendLog(`Failed ${project.name}: ${lastMessage}`)
               break
             }
-            appendLog(`Rate limit for ${project.name}. Retry ${attempts}/3 will wait 90 seconds.`)
+            appendLog(`Rate limit for ${project.name}. Retry ${attempts}/3 will wait 60 seconds.`)
           }
         } catch (caught) {
           lastMessage = caught instanceof Error ? caught.message : 'Could not reach the evaluation service.'
@@ -199,7 +199,7 @@ export default function CA3Evaluate() {
     <div className="flex flex-wrap items-start justify-between gap-3">
       <div>
         <h2 className="text-lg font-semibold">Evaluate</h2>
-        <p className="mt-1 text-sm text-gray-400">Batch evaluation runs only for teams whose artifacts are Submitted or Presented. Groq requests are separated by 90 seconds; a rate-limit failure is retried up to three times.</p>
+        <p className="mt-1 text-sm text-gray-400">Batch evaluation runs only for teams whose artifacts are Submitted, Presented, or Evaluation Complete. Groq requests are separated by 60 seconds; a rate-limit failure is retried up to three times.</p>
       </div>
       <button type="button" onClick={() => void loadProjects()} disabled={loading || running !== null} className="btn-secondary text-sm disabled:opacity-50">Refresh teams</button>
     </div>
@@ -210,9 +210,9 @@ export default function CA3Evaluate() {
         <fieldset className="mt-4">
           <legend className="text-xs font-semibold uppercase tracking-wide text-gray-400">Evaluate artifact status</legend>
           <div className="mt-2 flex flex-wrap gap-3 text-sm text-gray-300">
-            {(['both', 'submitted', 'presented'] as const).map(status => <label key={status} className="flex items-center gap-1.5">
+            {(['all', 'submitted', 'presented', 'evaluation_complete'] as const).map(status => <label key={status} className="flex items-center gap-1.5">
               <input type="radio" name={`${job.kind}-status`} checked={filters[job.kind].status === status} onChange={() => setFilters(current => ({ ...current, [job.kind]: { ...current[job.kind], status } }))} disabled={loading || running !== null} />
-              {status === 'both' ? 'Both' : status.charAt(0).toUpperCase() + status.slice(1)}
+              {status === 'all' ? 'All' : status === 'evaluation_complete' ? 'Evaluation Complete' : status.charAt(0).toUpperCase() + status.slice(1)}
             </label>)}
           </div>
         </fieldset>
@@ -225,7 +225,7 @@ export default function CA3Evaluate() {
         </button>
       </div>)}
     </div>
-    <p className="mt-4 text-sm text-gray-400">{loading ? 'Loading teams…' : `${projects.filter(project => ['submitted', 'presented'].includes(statusFor(project))).length} submitted/presented team(s) available.`}</p>
+    <p className="mt-4 text-sm text-gray-400">{loading ? 'Loading teams…' : `${projects.filter(project => ['submitted', 'presented', 'evaluation_complete'].includes(statusFor(project))).length} Submitted/Presented/Evaluation Complete team(s) available.`}</p>
     {progress && <p role="status" className="mt-4 rounded-lg bg-indigo-950/40 px-4 py-3 text-sm text-indigo-200">{progress}</p>}
     {message && <p role="status" className="mt-4 rounded-lg bg-emerald-900/40 px-4 py-3 text-sm text-emerald-300">{message}</p>}
     {error && <p role="alert" className="mt-4 rounded-lg bg-red-900/40 px-4 py-3 text-sm text-red-300">{error}</p>}
