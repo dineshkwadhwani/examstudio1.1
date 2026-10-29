@@ -7,10 +7,13 @@ export async function GET(request: NextRequest) {
   try {
     await requireSA()
     const url = new URL(request.url)
-    const assessmentId = Number(url.searchParams.get('assessment_id'))
-    const cohortId = url.searchParams.get('cohort_id') ? Number(url.searchParams.get('cohort_id')) : null
+    const assessmentParam = url.searchParams.get('assessment_id')?.trim() || null
+    const cohortParam = url.searchParams.get('cohort_id')?.trim() || null
+    const assessmentId = assessmentParam ? Number(assessmentParam) : null
+    const cohortId = cohortParam ? Number(cohortParam) : null
     const submittedDate = url.searchParams.get('submitted_date')?.trim() || null
-    if (!Number.isInteger(assessmentId) || assessmentId < 1) return badRequest('assessment_id is required.')
+    if (assessmentId !== null && (!Number.isInteger(assessmentId) || assessmentId < 1)) return badRequest('assessment_id is invalid.')
+    if (cohortId !== null && (!Number.isInteger(cohortId) || cohortId < 1)) return badRequest('cohort_id is invalid.')
     let dateStart: string | null = null
     let dateEnd: string | null = null
     if (submittedDate) {
@@ -24,12 +27,13 @@ export async function GET(request: NextRequest) {
       dateStart = start.toISOString()
       dateEnd = end.toISOString()
     }
-    const { data: papers, error } = await db.from('ca1_assessment_papers')
+    let papersQuery = db.from('ca1_assessment_papers')
       .select('*, ca1_students(id, name, prn, email), ca1_assessments(name, total_marks), ca1_assessment_assignments(cohort_id, ca1_assessment_cohorts(name))')
-      .eq('assessment_id', assessmentId)
-      .gte('submitted_at', dateStart ?? '0001-01-01T00:00:00.000Z')
-      .lt('submitted_at', dateEnd ?? '9999-12-31T23:59:59.999Z')
       .order('submitted_at', { ascending: false })
+    if (assessmentId !== null) papersQuery = papersQuery.eq('assessment_id', assessmentId)
+    if (dateStart) papersQuery = papersQuery.gte('submitted_at', dateStart)
+    if (dateEnd) papersQuery = papersQuery.lt('submitted_at', dateEnd)
+    const { data: papers, error } = await papersQuery
     if (error) throw error
     const filtered = (papers ?? []).filter((paper: { ca1_assessment_assignments?: { cohort_id?: number | null } | null }) => !cohortId || paper.ca1_assessment_assignments?.cohort_id === cohortId)
     return ok({ results: filtered })

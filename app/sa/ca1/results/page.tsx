@@ -23,9 +23,12 @@ export default function Ca1ResultsPage() {
   useEffect(() => { Promise.all([fetch('/api/sa/assessments'), fetch('/api/sa/assessment-cohorts')]).then(async ([a, c]) => { const ad = await a.json(); const cd = await c.json(); setAssessments(ad.assessments ?? []); setCohorts(cd.cohorts ?? []) }).catch(() => setError('Could not load result filters.')) }, [])
 
   async function search() {
-    if (!assessmentId) { setError('Choose an assessment first.'); return }
     setLoading(true); setError('')
-    const response = await fetch(`/api/sa/assessment-results?assessment_id=${assessmentId}${cohortId ? `&cohort_id=${cohortId}` : ''}${submittedDate ? `&submitted_date=${submittedDate}` : ''}`)
+    const query = new URLSearchParams()
+    if (assessmentId) query.set('assessment_id', assessmentId)
+    if (cohortId) query.set('cohort_id', cohortId)
+    if (submittedDate) query.set('submitted_date', submittedDate)
+    const response = await fetch(`/api/sa/assessment-results${query.toString() ? `?${query.toString()}` : ''}`)
     const data = await response.json(); setLoading(false)
     if (!response.ok) { setError(data.message ?? 'Could not load results.'); return }
     setResults(data.results ?? [])
