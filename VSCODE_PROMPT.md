@@ -1,5 +1,7 @@
 # Exam Studio — Complete VS Code / Cursor Project Prompt
 
+> **Current handoff (2026-11-05):** Start with [`docs/README.md`](docs/README.md) and [`docs/TRANSFER.md`](docs/TRANSFER.md). This prompt is a historical broad-context reference; the maintained documentation covers migrations through 036, merged CA1 assessments, CA3 evaluation/Insights, GitHub branch aggregation, Groq key rotation, and current operations.
+
 Paste this entire document into Cursor or VS Code Copilot Chat at the start of a new session. It contains everything needed to understand, build, extend, or debug this project without asking any clarifying questions.
 
 ---

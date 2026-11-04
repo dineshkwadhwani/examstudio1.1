@@ -68,7 +68,7 @@ Do not change exam scoring, session lifecycle, or API-key behavior while modifyi
 
 Team tables are introduced by `supabase/migrations/012_ca1_teams.sql`, `supabase/migrations/013_ca1_team_rejoin.sql`, and `supabase/migrations/014_ca1_team_review.sql`. Apply these migrations in order. Migration 013 removes the historical full membership uniqueness constraint and replaces it with a partial active-membership index so a student can leave and later rejoin the same team. Migration 014 adds the Super Admin project strength and review comments.
 
-CA3 artifacts and evaluation are introduced by migrations `015` through `018`. Migration 015 stores one artifact submission per approved team, per-category shared scores, individual contribution scores, GitHub usernames, and the CA3 publication flag. Migration 016 stores traceable GitHub contribution statistics. Migration 017 adds private Supabase Storage for the synopsis and design-document PDFs. Migration 018 adds raw fields for the automated GitHub contribution scorecard. The demo video remains a mandatory external URL stored in the existing artifact record. Apply them after 014; do not renumber or edit an already-applied migration.
+CA3 artifacts and evaluation begin at migrations `015` through `018` and continue through `036`. Later migrations add presentation dates, legacy assessment merge, AI feedback, Presented/Evaluation Complete workflow states, member total overrides/maxima, explicit session registration, and legacy-result repair. The demo video remains a mandatory external URL stored in the existing artifact record. Apply migrations after 014 in numeric order; there are two distinct `030_*.sql` files, so record both explicitly. Do not renumber or edit an already-applied migration.
 
 ### Team rules
 
@@ -113,7 +113,7 @@ When a previously unregistered reserved roster student registers, `app/api/auth/
 
 ## Database and migrations
 
-Migrations are plain SQL and must be applied in numeric order. The current sequence ends at 018. Do not edit an already-applied migration to change production behavior; add a new numbered migration instead.
+Migrations are plain SQL and must be applied in numeric order. The current repository sequence reaches 036, with duplicate `030` filenames that are independent migrations. See `docs/DATABASE.md` for the complete ledger and hazards. Do not edit an already-applied migration to change production behavior; add a new numbered migration instead.
 
 Important migration sequence:
 

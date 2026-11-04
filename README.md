@@ -1,10 +1,12 @@
-# Exam Studio — F0003 CA1
+# Exam Studio — F0003 CA2/CA3
+
+> Current technical handoff: read [`docs/README.md`](docs/README.md), especially [`docs/TRANSFER.md`](docs/TRANSFER.md), before moving or modifying this project. The older CA1 setup below is retained as historical quick-start material.
 
 CA1 Practical Examination Platform — Autonomous AI Systems and Agent-Based Computing
 Symbiosis Institute of Technology, Pune
 
 ## Stack
-Next.js 15 · TypeScript · Supabase · Vercel · Tailwind CSS · Open-Meteo · Apify
+Next.js 16.3.4 · React 19 · TypeScript · Supabase · Vercel · Tailwind CSS · Open-Meteo · Apify · GitHub · Groq
 
 ---
 

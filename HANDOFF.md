@@ -1,5 +1,7 @@
 # CA1 Practical Examination Platform — Complete Handoff Document
 
+> **Current handoff:** This document contains historical CA1 detail. For the complete current project, read [`docs/README.md`](docs/README.md) and [`docs/TRANSFER.md`](docs/TRANSFER.md). The current code includes CA1, merged legacy assessments, CA2/CA3 session registration, and CA3 evaluation through migration 036.
+
 **Project:** Exam Studio — CA1 Practical Examination Platform  
 **Course:** F0003 Autonomous AI Systems and Agent-Based Computing  
 **Institution:** Symbiosis Institute of Technology, Pune  
